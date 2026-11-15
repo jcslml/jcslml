@@ -122,7 +122,7 @@ h2::first-letter{text-transform:uppercase}
 /* bottom navigation */
 .tabbar{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);border-top:1px solid var(--line);
   padding-bottom:env(safe-area-inset-bottom,0px);padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px)}
-.tabbar-in{max-width:680px;margin:0 auto;display:grid;grid-template-columns:repeat(4,1fr);height:var(--tabbar-h)}
+.tabbar-in{max-width:680px;margin:0 auto;display:grid;grid-template-columns:repeat(3,1fr);height:var(--tabbar-h)}
 .tabbar button{border:0;background:transparent;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-size:12px;font-weight:500;color:var(--muted)}
 .tabbar svg{width:22px;height:22px;stroke:currentColor;padding:0;box-sizing:content-box;border-radius:999px}
 .tabbar button[aria-current="page"]{color:var(--fg);font-weight:600}
@@ -189,6 +189,16 @@ form{display:flex;flex-direction:column;gap:14px}
 .qbtn.no{color:var(--bad)}
 .qbtn:disabled{opacity:.5}
 .quickbar{display:flex;flex-wrap:wrap;gap:8px;margin:-4px 0 18px}
+.glines{display:flex;flex-direction:column;gap:8px}
+.gline{display:flex;align-items:center;gap:8px}
+.gline .gl-tipo{flex:1;min-width:0;font-weight:600}
+.field .gline input{width:120px;flex:none;text-align:right}
+.gl-x{flex:none;width:38px;height:38px;border:0;border-radius:50%;background:var(--surface-2);color:var(--muted);font-size:20px;line-height:1}
+.gadd{display:flex;flex-wrap:wrap;gap:6px}
+.gchip{border:1px dashed var(--muted);background:transparent;border-radius:999px;padding:7px 12px;font-size:14px;font-weight:500}
+.gchip:active{background:var(--surface-2)}
+.field input[type=number]{-moz-appearance:textfield;appearance:textfield}
+.field input[type=number]::-webkit-inner-spin-button,.field input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
 details.more{border:1px solid var(--line);border-radius:12px}
 details.more>summary{list-style:none;cursor:pointer;padding:13px 14px;font-weight:600;font-size:15px;display:flex;justify-content:space-between;align-items:center}
 details.more>summary::-webkit-details-marker{display:none}
@@ -242,7 +252,6 @@ details.more .fields{display:flex;flex-direction:column;gap:14px;padding:2px 14p
   <div class="tabbar-in">
     <button type="button" data-tab="resumen"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3 8 4-16 3 8h4"/></svg>Resumen</button>
     <button type="button" data-tab="bolos"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>Bolos</button>
-    <button type="button" data-tab="gastos"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2v20l3-2 3 2 3-2 3 2 3-2 1 .7V2l-1 .7-3-2-3 2-3-2-3 2-3-2z"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>Gastos</button>
     <button type="button" data-tab="empresas"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 9h1M14 9h1M9 13h1M14 13h1M9 17h1M14 17h1"/></svg>Empresas</button>
   </div>
 </nav>
@@ -324,7 +333,10 @@ const cobradoDe = b => b.pago==="pagado" ? importe(b) : b.pago==="parcial" ? Mat
 const pendienteDe = b => activo(b) ? Math.max(importe(b)-cobradoDe(b),0) : 0;
 /* money owed for work already done (a future confirmed gig is not a debt yet) */
 const deudaDe = b => (hecho(b) || b.pago==="parcial") ? pendienteDe(b) : 0;
-const gastosDe = id => gastosArr().filter(g=>g.boloId===id);
+const TIPOS_GASTO = {gasolina:"Gasolina",comida:"Comida",parking:"Parking",peajes:"Peajes",hotel:"Hotel",transporte:"Tren / bus",otro:"Otro"};
+const lineasDe = b => (b && Array.isArray(b.gastos) ? b.gastos : []).filter(x=>x && num(x.importe)>0);
+const gastoTotal = b => suma(lineasDe(b),x=>num(x.importe));
+const gastosDe = id => lineasDe(S.bolos.get(id));
 const plazoDe = nombre => { const e=S.empresas.get(slug(nombre)); return e && num(e.plazo)>0 ? num(e.plazo) : num(S.ajustes.plazo)||30; };
 const atrasado = b => hecho(b) && deudaDe(b)>0 && daysBetween(finDe(b),TODAY) > plazoDe(b.empresa);
 function inPeriod(s){ if(!s) return false; return UI.mode==="mes" ? s.startsWith(UI.y+"-"+pad(UI.m+1)) : s.startsWith(UI.y+"-"); }
@@ -333,7 +345,7 @@ function periodoTexto(){ return UI.mode==="mes" ? MESES[UI.m]+" de "+UI.y : Stri
 function periodoActual(){ return UI.y===today.getFullYear() && (UI.mode==="anio" || UI.m===today.getMonth()); }
 function periodoPasado(){ return UI.y<today.getFullYear() || (UI.mode==="mes" && UI.y===today.getFullYear() && UI.m<today.getMonth()); }
 function empresasNombres(){ const set=new Map(); bolosArr().forEach(b=>{ if(b.empresa) set.set(slug(b.empresa),b.empresa); }); S.empresas.forEach((e,k)=>{ if(e.nombre && !set.has(k)) set.set(k,e.nombre); }); return [...set.values()].sort((a,b)=>a.localeCompare(b,"es")); }
-function lugares(){ const s=new Set(); bolosArr().forEach(b=>b.lugar&&s.add(b.lugar)); gastosArr().forEach(g=>g.lugar&&s.add(g.lugar)); return [...s].sort((a,b)=>a.localeCompare(b,"es")); }
+function lugares(){ const s=new Set(); bolosArr().forEach(b=>b.lugar&&s.add(b.lugar)); return [...s].sort((a,b)=>a.localeCompare(b,"es")); }
 function ultimoDe(empresa,exceptId){
   if(!String(empresa||"").trim()) return null;
   const k=slug(empresa);
@@ -537,13 +549,12 @@ function render(){
   $("#mode-anio").setAttribute("aria-pressed",UI.mode==="anio");
   $("#hoy").hidden = periodoActual();
   document.querySelectorAll(".tabbar button").forEach(b=>b.setAttribute("aria-current",b.dataset.tab===UI.tab?"page":"false"));
-  $("#fab-label").textContent = UI.tab==="gastos" ? "Nuevo gasto" : "Nuevo bolo";
   $("#fab").hidden = UI.tab==="empresas";
   renderBanner();
   const v=$("#view");
   if(!S.loaded){ v.innerHTML='<div class="empty"><strong>Cargando tus bolos…</strong>Un momento.</div>'; return; }
   const ae=document.activeElement; const keep = ae && ae.id==="q" ? [ae.selectionStart,ae.selectionEnd] : null;
-  v.innerHTML = UI.tab==="resumen" ? vResumen() : UI.tab==="bolos" ? vBolos() : UI.tab==="gastos" ? vGastos() : vEmpresas();
+  v.innerHTML = UI.tab==="resumen" ? vResumen() : UI.tab==="bolos" ? vBolos() : vEmpresas();
   if(keep){ const q=$("#q"); if(q){ q.focus(); try{ q.setSelectionRange(keep[0],keep[1]); }catch(e){} } }
 }
 
@@ -587,7 +598,7 @@ function calcPeriodo(){
   const aire=bs.filter(b=>b.estado==="posible"||b.estado==="reserva");
   return {bs,act,trabajado,porVenir,ingresos:trabajado+porVenir,
     cobrado:suma(act,cobradoDe),
-    gastos:suma(gastosArr().filter(g=>inPeriod(g.fecha)),g=>num(g.importe)),
+    gastos:suma(bs,gastoTotal),
     jornadas:suma(act,b=>num(b.jornadas)||1),
     aire,aireImp:suma(aire,importe)};
 }
@@ -632,7 +643,7 @@ function tablaMeses(){
   for(let m=0;m<12;m++){
     const pre=UI.y+"-"+pad(m+1);
     const ing=suma(bolosArr().filter(b=>activo(b)&&b.fecha.startsWith(pre)),importe);
-    const gas=suma(gastosArr().filter(g=>g.fecha.startsWith(pre)),g=>num(g.importe));
+    const gas=suma(bolosArr().filter(b=>b.fecha.startsWith(pre)),gastoTotal);
     if(ing||gas) rows.push({pre,m,ing,gas});
   }
   if(!rows.length) return "";
@@ -761,41 +772,6 @@ function calendar(){
   return h+'</div><div class="legend">'+Object.values(ESTADOS).map(estadoChip).join("")+'</div>';
 }
 
-function vGastos(){
-  const gs = gastosArr().filter(g=>inPeriod(g.fecha)).sort((a,b)=>b.fecha.localeCompare(a.fecha));
-  if(!gs.length) return `<div class="empty"><strong>Sin gastos en ${esc(periodoTexto())}</strong>Apunta gasolina, peajes, dietas, material o la cuota de autónomos con «Nuevo gasto». Si lo asocias a un bolo, sabrás cuánto te deja cada uno.</div>`;
-  const tot=suma(gs,g=>num(g.importe));
-  const porCat=new Map(); gs.forEach(g=>porCat.set(g.categoria||"otros",(porCat.get(g.categoria||"otros")||0)+num(g.importe)));
-  let h=`<div class="card hero"><div class="hero-main"><div><div class="cap">Gastos de ${esc(periodoTexto())}</div><div class="big">${eur(tot)}</div></div><div class="small muted">${plural(gs.length,"apunte","apuntes")}</div></div>
-    <div class="cats">${[...porCat.entries()].sort((a,b)=>b[1]-a[1]).map(([k,v])=>`<div><div style="display:flex;justify-content:space-between;gap:10px;font-size:14px"><span>${esc(CATS[k]||k)}</span><span class="num">${eur(v)}</span></div><div class="bar"><i style="width:${tot?Math.round(v/tot*100):0}%"></i></div></div>`).join("")}</div></div>`;
-  h+=`<h2>Apuntes</h2><div class="stack">${gs.map(g=>{
-    const b=g.boloId?S.bolos.get(g.boloId):null, d=parse(g.fecha);
-    const sub=[CATS[g.categoria]||"Otros", b?(b.evento||b.empresa):"", g.lugar].filter(Boolean).join(" · ");
-    return `<button class="row" type="button" data-gasto="${g.id}"><div class="datebox"><div class="d">${d.getDate()}</div><div class="w">${UI.mode==="anio"?MESES[d.getMonth()].slice(0,3):DIAS[d.getDay()]}</div></div>
-      <div class="row-body"><div class="row-title">${esc(g.concepto||CATS[g.categoria]||"Gasto")}</div><div class="row-sub">${esc(sub)}</div></div>
-      <div class="row-amt"><div class="a num">${eur(num(g.importe))}</div>${g.categoria==="km"&&g.km?`<div class="b num">${esc(g.km)} km</div>`:""}</div></button>`;
-  }).join("")}</div>`;
-  return h;
-}
-
-function vEmpresas(){
-  const names=empresasNombres();
-  if(!names.length) return '<div class="empty"><strong>Aún no hay empresas</strong>Aparecen solas cuando apuntas un bolo con su empresa. Aquí verás cuánto te ha pagado cada una, lo que te debe y sus datos de contacto.</div>';
-  const all=bolosArr();
-  const rows=names.map(n=>{
-    const k=slug(n), bs=all.filter(b=>b.empresa&&slug(b.empresa)===k), act=bs.filter(activo);
-    return {n,k,info:S.empresas.get(k)||{},count:act.length,per:suma(act.filter(b=>inPeriod(b.fecha)),importe),
-      total:suma(act,importe),debe:suma(bs,deudaDe),late:bs.some(atrasado),last:act.map(b=>b.fecha).sort().pop()};
-  }).sort((a,b)=>b.debe-a.debe||b.per-a.per||b.total-a.total);
-  return `<p class="small muted" style="margin:0 4px 10px">Primero las que te deben dinero. La cifra grande es lo ganado con cada una en ${esc(periodoTexto())}.</p><div class="stack">${rows.map(r=>
-    `<button class="row" type="button" data-empresa="${esc(r.k)}" data-nombre="${esc(r.n)}" style="align-items:flex-start"><div class="row-body">
-      <div class="row-title">${esc(r.n)}</div>
-      <div class="row-sub">${plural(r.count,"bolo","bolos")} en total · último ${r.last?esc(fmtDate(r.last)+" "+r.last.slice(0,4)):"—"}</div>
-      ${r.info.contacto||r.info.telefono?`<div class="row-sub">${esc([r.info.contacto,r.info.telefono].filter(Boolean).join(" · "))}</div>`:""}
-      <div class="chips">${r.debe>0?`<span class="chip ${r.late?"c-bad":"c-warn"}">Te debe ${eur(r.debe)}</span>`:'<span class="chip c-ok">Al día</span>'}<span class="chip c-plain">Paga a ${plazoDe(r.n)} días</span></div></div>
-      <div class="row-amt"><div class="a num">${eur(r.per)}</div><div class="b">en total <span class="num">${eur(r.total)}</span></div></div></button>`).join("")}</div>`;
-}
-
 /* ---------- sheets ---------- */
 function openSheet(html,onReady){
   $("#sheet-body").innerHTML=html; $("#sheet").hidden=false; $("#backdrop").hidden=false;
@@ -821,7 +797,6 @@ function boloForm(id,preset){
   const b = id ? {...S.bolos.get(id),id} : {fecha:TODAY,estado:"confirmado",pago:"pendiente",tipoPrecio:"total",jornadas:1,...(preset||{})};
   const cobroAbierto = !nuevo && (hecho(b) || (b.pago&&b.pago!=="pendiente"));
   const masAbierto = !!(b.puesto||num(b.extras)||b.notas);
-  const gs = id ? gastosDe(id) : [], gtot=suma(gs,g=>num(g.importe));
   const qb = id ? quickButtons(b) : [];
   const radios = Object.entries(ESTADOS).map(([k,e])=>`<label><input type="radio" name="estado" value="${k}"${b.estado===k?" checked":""}><span><i class="sw d-${e.cls}"></i>${e.label}</span></label>`).join("");
   const html=`<h3>${nuevo?"Nuevo bolo":"Editar bolo"}</h3>
@@ -838,6 +813,11 @@ function boloForm(id,preset){
       <div class="field"><label for="b-tipo">Ese precio es</label><select id="b-tipo" name="tipoPrecio">${opt("total","Por todo el bolo",b.tipoPrecio)}${opt("jornada","Por jornada",b.tipoPrecio)}</select></div></div>
     <div class="calc" id="b-calc"></div>
     <div class="field"><span class="lbl">Estado</span><div class="radios" id="b-estado">${radios}</div></div>
+    <div class="field"><span class="lbl">Gastos de este día</span>
+      <div class="glines" id="g-lineas"></div>
+      <div class="gadd">${Object.entries(TIPOS_GASTO).map(([k,l])=>`<button type="button" class="gchip" data-gtipo="${k}">+ ${l}</button>`).join("")}</div>
+      <div class="calc" id="g-tot" hidden></div>
+    </div>
     <details class="more"${cobroAbierto?" open":""}><summary>Cobro</summary><div class="fields">
       <div class="two"><div class="field"><label for="b-pago">¿Te lo han pagado?</label><select id="b-pago" name="pago">${Object.entries(PAGOS).map(([k,l])=>opt(k,l,b.pago||"pendiente")).join("")}</select></div>
         <div class="field"><label for="b-fcobro">Fecha de cobro</label><input id="b-fcobro" type="date" name="fechaCobro" value="${esc(b.fechaCobro)}"></div></div>
@@ -850,9 +830,6 @@ function boloForm(id,preset){
       <span class="hint">Los extras se suman al precio pactado: horas extra, dietas o kilometraje que te paga la empresa.</span>
       <div class="field"><label for="b-notas">Notas</label><textarea id="b-notas" name="notas" placeholder="Contacto en el bolo, material, horarios…">${esc(b.notas)}</textarea></div>
     </div></details>
-    ${id?`<div class="field"><span class="lbl">Gastos de este bolo · <span class="num">${eur(gtot)}</span> · te deja <span class="num">${eur(importe(b)-gtot)}</span></span>
-      ${gs.length?`<div class="stack" style="border:1px solid var(--line)">${gs.map(g=>`<button class="row" type="button" data-gasto="${g.id}" style="padding:10px 12px"><div class="row-body"><div class="row-title">${esc(g.concepto||CATS[g.categoria]||"Gasto")}</div><div class="row-sub">${esc(fmtDate(g.fecha)+" · "+(CATS[g.categoria]||""))}</div></div><div class="row-amt"><div class="a num">${eur(num(g.importe))}</div></div></button>`).join("")}</div>`:""}
-      <button class="btn" type="button" id="b-addgasto">Añadir gasto a este bolo</button></div>`:""}
     <div class="actions"><button class="btn primary" type="submit">Guardar</button><button class="btn" type="button" id="b-cancel">Cancelar</button></div>
     ${id?`<div class="actions"><button class="btn" type="button" id="b-dup">Duplicar</button><button class="btn danger" type="button" id="b-del">Borrar</button></div>`:""}
   </form>`;
@@ -863,7 +840,25 @@ function boloForm(id,preset){
       const tot=importe({precio:f.precio.value,tipoPrecio:f.tipoPrecio.value,jornadas:f.jornadas.value,extras:f.extras.value});
       root.querySelector("#b-calc").innerHTML=`<span class="muted">Total del bolo</span><span class="num"><strong>${eur(tot)}</strong></span>`;
       root.querySelector("#b-cobrado-wrap").hidden = f.pago.value!=="parcial";
+      pintaTot();
     };
+    /* expense lines for this day */
+    const lineas = lineasDe(b).map(x=>({tipo:x.tipo,importe:num(x.importe)}));
+    const caja=root.querySelector("#g-lineas"), totEl=root.querySelector("#g-tot");
+    function pintaTot(){
+      const g=suma(lineas,x=>num(x.importe)), tot=importe({precio:f.precio.value,tipoPrecio:f.tipoPrecio.value,jornadas:f.jornadas.value,extras:f.extras.value});
+      totEl.hidden=!lineas.length;
+      totEl.innerHTML=`<span class="muted">Gastos ${eur(g)}</span><span class="num">Te queda <strong>${eur(tot-g)}</strong></span>`;
+    }
+    function pintaLineas(foco){
+      caja.innerHTML=lineas.map((x,i)=>`<div class="gline"><span class="gl-tipo">${esc(TIPOS_GASTO[x.tipo]||x.tipo||"Gasto")}</span><input type="number" inputmode="decimal" step="0.01" min="0" placeholder="€" aria-label="Importe de ${esc(TIPOS_GASTO[x.tipo]||"gasto")}" data-gi="${i}" value="${x.importe||""}"><button type="button" class="gl-x" data-gx="${i}" aria-label="Quitar gasto">×</button></div>`).join("");
+      pintaTot();
+      if(foco!=null){ const el=caja.querySelector(`[data-gi="${foco}"]`); if(el) el.focus(); }
+    }
+    root.querySelector(".gadd").addEventListener("click",e=>{ const t=e.target.closest("[data-gtipo]"); if(!t) return; lineas.push({tipo:t.dataset.gtipo,importe:""}); pintaLineas(lineas.length-1); });
+    caja.addEventListener("input",e=>{ const i=e.target.dataset.gi; if(i==null) return; lineas[i].importe=e.target.value; pintaTot(); });
+    caja.addEventListener("click",e=>{ const t=e.target.closest("[data-gx]"); if(!t) return; lineas.splice(Number(t.dataset.gx),1); pintaLineas(); });
+    pintaLineas();
     const syncDays=()=>{ if(f.fechaFin.value && f.fecha.value && f.fechaFin.value>=f.fecha.value && (nuevo || num(b.jornadas)<=1)){ f.jornadas.value=daysBetween(f.fecha.value,f.fechaFin.value)+1; calc(); } };
     paintRadios(); calc();
     root.querySelector("#b-estado").addEventListener("change",paintRadios);
@@ -885,6 +880,7 @@ function boloForm(id,preset){
       e.preventDefault();
       const fd=new FormData(f); const o={};
       ["evento","empresa","fecha","fechaFin","hora","lugar","puesto","tipoPrecio","pago","fechaCobro","notas","estado","extrasNota"].forEach(k=>o[k]=String(fd.get(k)||"").trim());
+      o.gastos=lineas.filter(x=>num(x.importe)>0).map(x=>({tipo:x.tipo,importe:Math.round(num(x.importe)*100)/100}));
       o.precio=num(fd.get("precio")); o.jornadas=num(fd.get("jornadas"))||1; o.cobrado=num(fd.get("cobrado")); o.extras=num(fd.get("extras"));
       if(!o.fecha){ toast("Pon la fecha del bolo"); return; }
       if(!o.evento && !o.empresa){ toast("Pon al menos el evento o la empresa"); f.evento.focus(); return; }
@@ -898,52 +894,9 @@ function boloForm(id,preset){
       if(await Store.put("bolos",bid,o)){ closeSheet(); toast(id?"Bolo guardado":"Bolo apuntado"); GCal.after(bid,o); }
     });
     if(id){
-      root.querySelector("#b-addgasto").addEventListener("click",()=>gastoForm(null,{boloId:id,fecha:b.fecha,lugar:b.lugar}));
-      root.querySelector("#b-dup").addEventListener("click",()=>{ const c={...b}; ["id","gcalId","fechaCobro","creado","actualizado"].forEach(k=>delete c[k]); c.pago="pendiente"; c.cobrado=0; c.estado="confirmado"; boloForm(null,c); toast("Copia lista: cambia la fecha y guarda"); });
+      root.querySelector("#b-dup").addEventListener("click",()=>{ const c={...b}; ["id","gcalId","fechaCobro","creado","actualizado","gastos"].forEach(k=>delete c[k]); c.pago="pendiente"; c.cobrado=0; c.estado="confirmado"; boloForm(null,c); toast("Copia lista: cambia la fecha y guarda"); });
       armDelete(root.querySelector("#b-del"),async()=>{ if(await Store.del("bolos",id)){ closeSheet(); toast("Bolo borrado"); if(b.gcalId) GCal.after(id,{...b,_borrado:true}); } });
     }
-  });
-}
-
-function gastoForm(id,preset){
-  const g = id ? {...S.gastos.get(id)} : {fecha:TODAY,categoria:"transporte",...(preset||{})};
-  const bs = bolosArr().filter(b=>b.estado!=="cancelado" || b.id===g.boloId).sort((a,b)=>b.fecha.localeCompare(a.fecha)).slice(0,120);
-  const html=`<h3>${id?"Editar gasto":"Nuevo gasto"}</h3><form id="f-gasto" autocomplete="off">
-    <div class="field"><label for="g-concepto">Concepto</label><input id="g-concepto" name="concepto" value="${esc(g.concepto)}" placeholder="Gasolina ida y vuelta, comida, guantes…"></div>
-    <div class="two"><div class="field"><label for="g-cat">Tipo</label><select id="g-cat" name="categoria">${Object.entries(CATS).map(([k,l])=>opt(k,l,g.categoria)).join("")}</select></div>
-      <div class="field"><label for="g-fecha">Fecha</label><input id="g-fecha" type="date" name="fecha" required value="${esc(g.fecha)}"></div></div>
-    <div class="field" id="g-km-wrap"><label for="g-km">Kilómetros</label><input id="g-km" type="number" inputmode="decimal" step="1" min="0" name="km" value="${esc(g.km||"")}"><span class="hint" id="g-km-hint"></span></div>
-    <div class="field"><label for="g-importe">Importe (€)</label><input id="g-importe" type="number" inputmode="decimal" step="0.01" min="0" name="importe" required value="${esc(g.importe)}"></div>
-    <div class="field"><label for="g-bolo">¿De qué bolo?</label><select id="g-bolo" name="boloId">${opt("","Ninguno (gasto general)",g.boloId||"")}${bs.map(b=>opt(b.id,fmtDate(b.fecha)+" "+b.fecha.slice(0,4)+" · "+(b.evento||b.empresa||"Bolo"),g.boloId)).join("")}</select></div>
-    <div class="field"><label for="g-lugar">Lugar</label><input id="g-lugar" name="lugar" list="dl-lug2" value="${esc(g.lugar)}" placeholder="Dónde fue el gasto"></div>${datalist("dl-lug2",lugares())}
-    <div class="field"><label for="g-notas">Notas</label><textarea id="g-notas" name="notas" placeholder="¿Tienes el tique? ¿Lo paga la empresa?">${esc(g.notas)}</textarea></div>
-    <div class="actions"><button class="btn primary" type="submit">Guardar</button><button class="btn" type="button" id="g-cancel">Cancelar</button></div>
-    ${id?'<div class="actions"><button class="btn danger" type="button" id="g-del">Borrar</button></div>':""}
-  </form>`;
-  openSheet(html,root=>{
-    const f=root.querySelector("#f-gasto");
-    const kmSync=(fromKm)=>{
-      const isKm=f.categoria.value==="km"; root.querySelector("#g-km-wrap").hidden=!isKm;
-      const rate=num(S.ajustes.km)||0.26;
-      root.querySelector("#g-km-hint").textContent="A "+String(rate).replace(".",",")+" €/km (cámbialo en Ajustes)";
-      if(isKm && fromKm) f.importe.value=(num(f.km.value)*rate).toFixed(2);
-    };
-    kmSync(false);
-    f.categoria.addEventListener("change",()=>kmSync(true));
-    f.km.addEventListener("input",()=>kmSync(true));
-    f.boloId.addEventListener("change",()=>{ const b=S.bolos.get(f.boloId.value); if(b && !f.lugar.value) f.lugar.value=b.lugar||""; });
-    root.querySelector("#g-cancel").addEventListener("click",closeSheet);
-    f.addEventListener("submit",async e=>{
-      e.preventDefault();
-      const fd=new FormData(f); const o={};
-      ["concepto","categoria","fecha","boloId","lugar","notas"].forEach(k=>o[k]=String(fd.get(k)||"").trim());
-      o.importe=num(fd.get("importe")); o.km=o.categoria==="km"?num(fd.get("km")):0;
-      if(!o.fecha){ toast("Pon la fecha del gasto"); return; }
-      if(!o.importe){ toast("Pon el importe"); f.importe.focus(); return; }
-      o.actualizado=new Date().toISOString();
-      if(await Store.put("gastos",id||newId(),o)){ closeSheet(); toast(id?"Gasto guardado":"Gasto apuntado"); }
-    });
-    if(id) armDelete(root.querySelector("#g-del"),async()=>{ if(await Store.del("gastos",id)){ closeSheet(); toast("Gasto borrado"); } });
   });
 }
 
@@ -1051,9 +1004,9 @@ function exportCSV(kind){
     bolosArr().sort((a,b)=>a.fecha.localeCompare(b.fecha)).forEach(b=>{ const g=suma(gastosDe(b.id),x=>num(x.importe));
       rows.push([b.fecha,b.fechaFin,b.evento,b.empresa,b.lugar,b.puesto,dec(num(b.jornadas)||1),dec(baseDe(b)),dec(num(b.extras)),dec(importe(b)),ESTADOS[estadoEf(b)].label,PAGOS[b.pago]||"",dec(cobradoDe(b)),dec(deudaDe(b)),b.fechaCobro,dec(g),dec(importe(b)-g),b.notas]); });
   } else {
-    rows=[["Fecha","Concepto","Tipo","Importe","Km","Bolo","Lugar","Notas"]];
-    gastosArr().sort((a,b)=>a.fecha.localeCompare(b.fecha)).forEach(g=>{ const b=g.boloId?S.bolos.get(g.boloId):null;
-      rows.push([g.fecha,g.concepto,CATS[g.categoria]||"",dec(num(g.importe)),g.km||"",b?(b.evento||b.empresa):"",g.lugar,g.notas]); });
+    rows=[["Fecha","Bolo","Lugar","Tipo","Importe"]];
+    bolosArr().sort((a,b)=>a.fecha.localeCompare(b.fecha)).forEach(b=>lineasDe(b).forEach(x=>
+      rows.push([b.fecha,b.evento||b.empresa,b.lugar,TIPOS_GASTO[x.tipo]||x.tipo||"",dec(num(x.importe))])));
   }
   saveFile(kind+"-"+TODAY+".csv","﻿"+rows.map(r=>r.map(csvCell).join(";")).join("\r\n"));
 }
@@ -1087,20 +1040,18 @@ $("#btn-ojo").addEventListener("click",()=>{ OCULTO=!OCULTO; try{ localStorage.s
 pintaOjo();
 $("#fab").addEventListener("click",()=>{
   const fueraDeHoy = UI.mode==="mes" && !inPeriod(TODAY) ? {fecha:UI.y+"-"+pad(UI.m+1)+"-01"} : null;
-  if(UI.tab==="gastos") gastoForm(null,fueraDeHoy);
-  else boloForm(null, UI.dia ? {fecha:UI.dia} : fueraDeHoy);
+  boloForm(null, UI.dia ? {fecha:UI.dia} : fueraDeHoy);
 });
 document.addEventListener("input",e=>{
   if(e.target.id!=="q") return;
   UI.q=e.target.value; const el=$("#bolos-body"); if(el) el.innerHTML=bolosBody();
 });
 document.addEventListener("click",e=>{
-  const t=e.target.closest("[data-quick],[data-bolo],[data-gasto],[data-empresa],[data-filtro],[data-bview],[data-dia],[data-nuevo-dia],[data-ym]");
+  const t=e.target.closest("[data-quick],[data-bolo],[data-empresa],[data-filtro],[data-bview],[data-dia],[data-nuevo-dia],[data-ym]");
   if(!t) return;
   const d=t.dataset;
   if(d.quick){ const [id,accion]=d.quick.split("|"); t.disabled=true; if(d.close || !$("#sheet").hidden) closeSheet(); quick(id,accion); return; }
   if(d.bolo) return boloForm(d.bolo);
-  if(d.gasto) return gastoForm(d.gasto);
   if(d.empresa) return empresaForm(d.empresa,d.nombre);
   if(d.filtro){ UI.filtro=d.filtro; return render(); }
   if(d.bview){ UI.bolosView=d.bview; return render(); }
@@ -1108,7 +1059,7 @@ document.addEventListener("click",e=>{
   if(d.nuevoDia) return boloForm(null,{fecha:d.nuevoDia});
   if(d.ym){ UI.mode="mes"; UI.y=Number(d.ym.slice(0,4)); UI.m=Number(d.ym.slice(5,7))-1; UI.dia=null; render(); window.scrollTo(0,0); }
 });
-function fromHash(){ const h=(location.hash||"").slice(1); if(["resumen","bolos","gastos","empresas"].includes(h)) UI.tab=h; }
+function fromHash(){ const h=(location.hash||"").slice(1); if(["resumen","bolos","empresas"].includes(h)) UI.tab=h; }
 window.addEventListener("hashchange",()=>{ fromHash(); render(); });
 fromHash();
 render();
