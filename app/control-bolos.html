@@ -223,7 +223,7 @@ const ESTADOS = {
 const PAGOS = {pendiente:"Sin cobrar",parcial:"Cobrado en parte",pagado:"Cobrado"};
 const CATS = {transporte:"Gasolina / transporte",km:"Kilometraje",peaje:"Peajes y parking",dietas:"Comidas y dietas",alojamiento:"Alojamiento",material:"Material y herramientas",formacion:"Formación",cuota:"Cuota de autónomos",gestoria:"Gestoría",otros:"Otros"};
 const PUESTOS = ["Técnico de iluminación","Jefe de iluminación","Operador de mesa","Programador","Montaje / desmontaje","Cañón de seguimiento","Rigger","Diseño de iluminación","Técnico de vídeo","Auxiliar"];
-const DEF_AJUSTES = {autonomo:true,irpf:15,iva:21,km:0.26,plazo:30};
+const DEF_AJUSTES = {autonomo:true,irpf:15,iva:21,km:0.26,plazo:30,gcalOn:false,gcalNombre:"Mis Bolos",gcalId:""};
 const MESES = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
 const DIAS = ["dom","lun","mar","mié","jue","vie","sáb"];
 const LS_KEY = "mis-bolos-v1";
@@ -327,6 +327,84 @@ const Store = {
   async del(col,id){
     if(this.db){ try{ await this.db.collection(col).doc(id).delete(); return true; }catch(e){ toast("No se pudo borrar"); return false; } }
     S[col].delete(id); this.saveLocal(); render(); return true;
+  }
+};
+
+
+/* ---------- Google Calendar (separate calendar, chosen by name) ---------- */
+const GC_SERVER = "Google Calendar";
+const GC_COLORS = {posible:"3",reserva:"5",confirmado:"10",realizado:"9"};
+const GC_PREFIX = {posible:"[Posible] ",reserva:"[Reserva] ",confirmado:"",realizado:""};
+const GCal = {
+  mcp:null, busy:false,
+  async get(){ if(this.mcp) return this.mcp; try{ this.mcp = window.claude ? await window.claude.use("mcp") : null; }catch(e){ this.mcp=null; } return this.mcp; },
+  enabled(){ return !!(S.ajustes.gcalOn && S.ajustes.gcalId); },
+  errText(e){
+    const c=e&&e.code;
+    if(c==="server_not_connected") return "Google Calendar no está conectado en tu cuenta de Claude (Ajustes → Conectores).";
+    if(c==="needs_reauth") return "Vuelve a conectar Google Calendar en Ajustes de Claude → Conectores.";
+    if(c==="not_in_manifest"||c==="approval_required"||c==="consent_required") return "Falta tu permiso para que la app use Google Calendar. Vuelve a intentarlo y pulsa Permitir.";
+    if(c==="blocked_by_policy") return "Tu organización no permite usar Google Calendar aquí.";
+    if(c==="server_unavailable") return "Google Calendar no responde ahora. Inténtalo en un rato.";
+    return "No se pudo actualizar Google Calendar"+(c?" ("+c+")":"")+".";
+  },
+  async call(tool,input){ const m=await this.get(); if(!m) throw {code:"not_granted"}; const r=await m.callTool(GC_SERVER,tool,input); return r ? r.payload : null; },
+  async findCalendar(nombre){
+    const p=await this.call("list_calendars",{pageSize:250});
+    const list=(p&&(p.calendars||p.items))||[];
+    const want=String(nombre||"").trim().toLowerCase();
+    const hit=list.find(c=>String(c.summary||"").trim().toLowerCase()===want);
+    return hit ? hit.id : "";
+  },
+  addDay(s){ const d=parse(s); d.setDate(d.getDate()+1); return iso(d); },
+  eventFor(b){
+    const titulo=(GC_PREFIX[b.estado]||"")+(b.evento||b.empresa||"Bolo")+(b.evento&&b.empresa?" · "+b.empresa:"");
+    const lines=[b.empresa&&"Empresa: "+b.empresa,b.lugar&&"Lugar: "+b.lugar,b.puesto&&"Puesto: "+b.puesto,
+      importe(b)?"Precio: "+eur(importe(b))+(b.tipoPrecio==="jornada"?" ("+eur(num(b.precio))+"/jornada)":""):"",
+      "Estado: "+((ESTADOS[b.estado]||{}).label||""),b.notas&&"Notas: "+b.notas,"Apuntado en Mis Bolos"].filter(Boolean);
+    const ev={calendarId:S.ajustes.gcalId,summary:titulo,description:lines.map(esc).join("<br>"),location:b.lugar||"",
+      colorId:GC_COLORS[b.estado]||"10",notificationLevel:"NONE"};
+    const fin=finDe(b);
+    if(b.hora){
+      ev.startTime=b.fecha+"T"+b.hora+":00";
+      if(fin>b.fecha) ev.endTime=fin+"T23:59:00";
+      else { const [h,m]=b.hora.split(":").map(Number); const eh=Math.min(h+8,23); ev.endTime=b.fecha+"T"+pad(eh)+":"+(eh===23&&h+8>23?"59":pad(m))+":00"; }
+    } else { ev.allDay=true; ev.startTime=b.fecha+"T00:00:00"; ev.endTime=this.addDay(fin)+"T00:00:00"; }
+    return ev;
+  },
+  idFrom(p){ if(!p) return ""; if(typeof p==="string"){ const m=p.match(/"id"\s*:\s*"([^"]+)"/); return m?m[1]:""; } return p.id||p.eventId||(p.event&&p.event.id)||""; },
+  /* returns the event id to keep on the gig ("" when none) */
+  async sync(b){
+    if(!this.enabled()) return b.gcalId||"";
+    if(b.estado==="cancelado" || b._borrado){
+      if(b.gcalId){ try{ await this.call("delete_event",{calendarId:S.ajustes.gcalId,eventId:b.gcalId,notificationLevel:"NONE"}); }catch(e){ if(e&&e.code!=="tool_error") throw e; } }
+      return "";
+    }
+    const ev=this.eventFor(b);
+    if(b.gcalId){
+      try{ await this.call("update_event",{...ev,eventId:b.gcalId}); return b.gcalId; }
+      catch(e){ if(!e||e.code!=="tool_error") throw e; /* event was removed by hand: create it again */ }
+    }
+    const p=await this.call("create_event",ev);
+    return this.idFrom(p);
+  },
+  /* sync one gig after a save, then remember its event id */
+  async after(id,b){
+    if(!this.enabled()) return;
+    try{
+      const gid=await this.sync(b);
+      if(!b._borrado && gid!==(b.gcalId||"")){ const cur=S.bolos.get(id)||b; const o={...cur,gcalId:gid}; delete o._borrado; await Store.put("bolos",id,o); }
+    }catch(e){ toast(this.errText(e)); }
+  },
+  async syncAll(onProgress){
+    const all=bolosArr().filter(b=>b.estado!=="cancelado"||b.gcalId);
+    let n=0, fails=0, lastErr=null;
+    for(const b of all){
+      try{ const gid=await this.sync(b); if(gid!==(b.gcalId||"")){ const o={...S.bolos.get(b.id),gcalId:gid}; await Store.put("bolos",b.id,o); } n++; }
+      catch(e){ fails++; lastErr=e; if(e&&["server_not_connected","needs_reauth","not_in_manifest","approval_required","blocked_by_policy","not_granted","consent_required"].includes(e.code)) break; }
+      if(onProgress) onProgress(n,all.length);
+    }
+    return {n,fails,lastErr,total:all.length};
   }
 };
 
@@ -585,13 +663,15 @@ function boloForm(id,preset){
       if(o.pago!=="parcial") o.cobrado = o.pago==="pagado" ? importe(o) : 0;
       if(o.estado==="confirmado" && finDe(o)<TODAY && o.pago==="pagado") o.estado="realizado";
       o.actualizado=new Date().toISOString(); if(!id) o.creado=o.actualizado; else o.creado=b.creado||o.actualizado;
-      const ok=await Store.put("bolos",id||newId(),o);
-      if(ok){ closeSheet(); toast(id?"Bolo guardado":"Bolo apuntado"); }
+      if(id && b.gcalId) o.gcalId=b.gcalId;
+      const bid=id||newId();
+      const ok=await Store.put("bolos",bid,o);
+      if(ok){ closeSheet(); toast(id?"Bolo guardado":"Bolo apuntado"); GCal.after(bid,o); }
     });
     if(id){
       root.querySelector("#b-addgasto").addEventListener("click",()=>gastoForm(null,{boloId:id,fecha:b.fecha,lugar:b.lugar}));
-      root.querySelector("#b-dup").addEventListener("click",()=>{ const c={...b}; delete c.factura; c.pago="pendiente"; c.cobrado=0; c.fechaCobro=""; c.estado="confirmado"; boloForm(null,c); toast("Copia lista: cambia la fecha y guarda"); });
-      armDelete(root.querySelector("#b-del"),async()=>{ if(await Store.del("bolos",id)){ closeSheet(); toast("Bolo borrado"); } });
+      root.querySelector("#b-dup").addEventListener("click",()=>{ const c={...b}; delete c.factura; c.pago="pendiente"; c.cobrado=0; c.fechaCobro=""; c.estado="confirmado"; delete c.gcalId; boloForm(null,c); toast("Copia lista: cambia la fecha y guarda"); });
+      armDelete(root.querySelector("#b-del"),async()=>{ if(await Store.del("bolos",id)){ closeSheet(); toast("Bolo borrado"); if(b.gcalId) GCal.after(id,{...b,_borrado:true}); } });
     }
   });
 }
@@ -669,6 +749,15 @@ function ajustesForm(){
     '<div class="two"><div class="field"><label for="a-km">Precio por km (€)</label><input id="a-km" type="number" inputmode="decimal" step="0.01" min="0" name="km" value="'+esc(A.km)+'"></div>'+
     '<div class="field"><label for="a-plazo">Plazo de cobro normal (días)</label><input id="a-plazo" type="number" inputmode="numeric" min="1" name="plazo" value="'+esc(A.plazo)+'"></div></div>'+
     '<div class="actions"><button class="btn primary" type="submit">Guardar ajustes</button></div></form>'+
+    '<h2>Google Calendar</h2>'+
+    '<div class="card" style="padding:14px;display:flex;flex-direction:column;gap:12px;background:var(--bg)">'+
+      '<p class="small" style="margin:0">Tus bolos se apuntan en un calendario aparte de Google Calendar, sin tocar tus otros calendarios. Los cancelados se quitan solos.</p>'+
+      '<div class="field"><label for="gc-nombre">Nombre del calendario en Google</label><input id="gc-nombre" value="'+esc(A.gcalNombre||"Mis Bolos")+'"></div>'+
+      '<div id="gc-estado" class="small"></div>'+
+      '<div class="actions" style="margin:0"><button class="btn" type="button" id="gc-conectar">'+(A.gcalId?"Volver a buscar":"Buscar calendario y activar")+'</button>'+
+      (A.gcalId?'<button class="btn" type="button" id="gc-todo">Pasar todos los bolos</button>':"")+'</div>'+
+      (A.gcalId?'<label class="switch" style="background:var(--surface)"><span>Sincronizar al guardar</span><input type="checkbox" id="gc-on"'+(A.gcalOn?" checked":"")+'></label>':"")+
+    '</div>'+
     '<h2>Tus datos</h2><p class="small muted" style="margin-top:0">'+(S.storeKind==="nube"?"Se guardan en tu cuenta de Claude y los ves igual en el móvil y en el ordenador.":"Se guardan solo en este dispositivo. Descarga una copia de vez en cuando.")+'</p>'+
     '<div class="actions"><button class="btn" type="button" id="x-csv-b">Exportar bolos (CSV)</button><button class="btn" type="button" id="x-csv-g">Exportar gastos (CSV)</button></div>'+
     '<div class="actions"><button class="btn" type="button" id="x-json">Descargar copia completa</button><button class="btn" type="button" id="x-import">Restaurar copia</button></div>'+
@@ -677,8 +766,34 @@ function ajustesForm(){
     const f=root.querySelector("#f-aj");
     f.addEventListener("submit",async e=>{
       e.preventDefault(); const fd=new FormData(f);
-      const o={autonomo:!!fd.get("autonomo"),irpf:num(fd.get("irpf")),iva:num(fd.get("iva")),km:num(fd.get("km")),plazo:num(fd.get("plazo"))||30};
+      const o={...S.ajustes,autonomo:!!fd.get("autonomo"),irpf:num(fd.get("irpf")),iva:num(fd.get("iva")),km:num(fd.get("km")),plazo:num(fd.get("plazo"))||30};
       if(await Store.put("ajustes","general",o)){ closeSheet(); toast("Ajustes guardados"); }
+    });
+    const gcEstado=root.querySelector("#gc-estado");
+    const paintGc=()=>{ gcEstado.innerHTML = S.ajustes.gcalId
+        ? (S.ajustes.gcalOn?'<span class="chip c-ok"><i class="dot d-ok"></i>Activado</span> ':'<span class="chip c-plain">En pausa</span> ')+'Usando el calendario «'+esc(S.ajustes.gcalNombre)+'».'
+        : '<span class="muted">Aún sin activar.</span>'; };
+    paintGc();
+    root.querySelector("#gc-conectar").addEventListener("click",async ev=>{
+      const btn=ev.currentTarget; const nombre=root.querySelector("#gc-nombre").value.trim()||"Mis Bolos";
+      btn.disabled=true; gcEstado.textContent="Buscando «"+nombre+"» en tu Google Calendar…";
+      try{
+        const cid=await GCal.findCalendar(nombre);
+        if(!cid){ gcEstado.innerHTML='<span class="chip c-warn">No encontrado</span> No tienes ningún calendario llamado «'+esc(nombre)+'». Créalo en calendar.google.com desde el navegador (versión para ordenador): «Otros calendarios» → «+» → «Crear calendario», ponle ese nombre y vuelve a pulsar este botón.'; btn.disabled=false; return; }
+        await Store.put("ajustes","general",{...S.ajustes,gcalId:cid,gcalNombre:nombre,gcalOn:true});
+        S.ajustes={...S.ajustes,gcalId:cid,gcalNombre:nombre,gcalOn:true};
+        toast("Calendario conectado"); ajustesForm();
+      }catch(e){ gcEstado.innerHTML='<span class="chip c-bad">Error</span> '+esc(GCal.errText(e)); btn.disabled=false; }
+    });
+    const gcOn=root.querySelector("#gc-on");
+    if(gcOn) gcOn.addEventListener("change",async()=>{ const on=gcOn.checked; S.ajustes={...S.ajustes,gcalOn:on}; await Store.put("ajustes","general",S.ajustes); paintGc(); toast(on?"Sincronización activada":"Sincronización en pausa"); });
+    const gcTodo=root.querySelector("#gc-todo");
+    if(gcTodo) gcTodo.addEventListener("click",async()=>{
+      if(!S.ajustes.gcalOn){ toast("Activa «Sincronizar al guardar» primero"); return; }
+      gcTodo.disabled=true;
+      const r=await GCal.syncAll((n,t)=>{ gcTodo.textContent="Pasando "+n+" de "+t+"…"; });
+      gcTodo.disabled=false; gcTodo.textContent="Pasar todos los bolos";
+      gcEstado.innerHTML = r.fails ? '<span class="chip c-warn">'+r.n+' de '+r.total+'</span> '+esc(GCal.errText(r.lastErr)) : '<span class="chip c-ok"><i class="dot d-ok"></i>Hecho</span> '+r.n+' bolo'+(r.n===1?"":"s")+' al día en «'+esc(S.ajustes.gcalNombre)+'».';
     });
     root.querySelector("#x-csv-b").addEventListener("click",()=>exportCSV("bolos"));
     root.querySelector("#x-csv-g").addEventListener("click",()=>exportCSV("gastos"));
@@ -744,7 +859,7 @@ document.addEventListener("click",async e=>{
     const id=t.dataset.cobrar, b=S.bolos.get(id); if(!b) return;
     const o={...b,pago:"pagado",cobrado:importe(b),fechaCobro:TODAY,actualizado:new Date().toISOString()};
     if(o.estado==="confirmado") o.estado="realizado";
-    t.disabled=true; if(await Store.put("bolos",id,o)) toast("Marcado como cobrado");
+    t.disabled=true; if(await Store.put("bolos",id,o)){ toast("Marcado como cobrado"); if(o.estado!==b.estado) GCal.after(id,o); }
     return;
   }
   if(t.dataset.bolo) return boloForm(t.dataset.bolo);
