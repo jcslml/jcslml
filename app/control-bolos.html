@@ -167,6 +167,47 @@ form{display:flex;flex-direction:column;gap:14px}
 .bar{height:6px;border-radius:3px;background:var(--surface-2);overflow:hidden;margin-top:5px}
 .bar i{display:block;height:100%;background:var(--accent);border-radius:3px}
 @media (prefers-reduced-motion:no-preference){.sheet{animation:up .2s ease-out}@keyframes up{from{transform:translateY(24px);opacity:.6}}}
+
+/* additions: next gig, tasks, quick actions, tables, search */
+.today-btn{border:0;background:var(--accent-soft);color:var(--accent);border-radius:999px;padding:6px 12px;font-size:13px;font-weight:600;flex:none}
+.nextcard{overflow:hidden}
+.nextmain{display:block;width:100%;text-align:left;border:0;background:transparent;padding:16px 18px 14px}
+.nextmain:active{background:var(--surface-2)}
+.when{font-size:14px;font-weight:600;color:var(--accent);margin-bottom:4px}
+.when::first-letter{text-transform:uppercase}
+.nexttitle{font-size:20px;font-weight:700;line-height:1.25}
+.nextmeta{font-size:15px;color:var(--muted);margin-top:2px}
+.nextmain .chips{margin-top:10px}
+.nextfoot{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;padding:11px 18px;border-top:1px solid var(--line);font-size:14px}
+.nextfoot a{color:var(--accent);font-weight:600;text-decoration:none}
+.sel{user-select:all;-webkit-user-select:all;color:var(--fg)}
+.debt-late{color:var(--bad);font-size:14px;font-weight:500}
+.task-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:0 14px 14px 72px}
+.task-actions .q{flex-basis:100%;font-size:14px;color:var(--muted)}
+.qbtn{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:7px 12px;font-size:14px;font-weight:600}
+.qbtn.ok{background:var(--ok-bg);color:var(--ok);border-color:transparent}
+.qbtn.no{color:var(--bad)}
+.qbtn:disabled{opacity:.5}
+.quickbar{display:flex;flex-wrap:wrap;gap:8px;margin:-4px 0 18px}
+details.more{border:1px solid var(--line);border-radius:12px}
+details.more>summary{list-style:none;cursor:pointer;padding:13px 14px;font-weight:600;font-size:15px;display:flex;justify-content:space-between;align-items:center}
+details.more>summary::-webkit-details-marker{display:none}
+details.more>summary::after{content:"";width:8px;height:8px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:rotate(45deg);margin:0 4px 4px 0}
+details.more[open]>summary::after{transform:rotate(-135deg);margin:4px 4px 0 0}
+details.more .fields{display:flex;flex-direction:column;gap:14px;padding:2px 14px 14px}
+.search{width:100%;border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:11px 14px;font-size:16px;margin-bottom:12px}
+.search:focus{outline:none;border-color:var(--accent)}
+.tblwrap{overflow-x:auto}
+.tbl{width:100%;border-collapse:collapse;font-size:14px;font-variant-numeric:tabular-nums}
+.tbl th{font-size:12px;font-weight:600;color:var(--muted);text-align:right;padding:11px 10px 7px;white-space:nowrap}
+.tbl td{padding:10px;text-align:right;border-top:1px solid var(--line);white-space:nowrap}
+.tbl th:first-child,.tbl td:first-child{text-align:left;padding-left:14px}
+.tbl th:last-child,.tbl td:last-child{padding-right:14px}
+.tbl tr.tot td{font-weight:700}
+.tbl td.dim{color:var(--muted)}
+.linkbtn{border:0;background:none;padding:0;color:var(--accent);font-weight:600}
+.toast{display:flex;align-items:center;gap:14px}
+.toast button{border:0;background:transparent;color:inherit;font-weight:700;text-decoration:underline;padding:0;flex:none}
 </style>
 
 <div class="wrap">
@@ -186,6 +227,7 @@ form{display:flex;flex-direction:column;gap:14px}
     <div class="period">
       <button class="icon-btn" id="prev" type="button" aria-label="Periodo anterior"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg></button>
       <div class="label" id="period-label">—</div>
+      <button class="today-btn" id="hoy" type="button" hidden>Hoy</button>
       <button class="icon-btn" id="next" type="button" aria-label="Periodo siguiente"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg></button>
     </div>
   </header>
@@ -214,19 +256,21 @@ form{display:flex;flex-direction:column;gap:14px}
 "use strict";
 /* ---------- constants ---------- */
 const ESTADOS = {
-  posible:{label:"Posible",cls:"idea",gel:"L126"},
-  reserva:{label:"En reserva",cls:"warn",gel:"L101"},
-  confirmado:{label:"Confirmado",cls:"ok",gel:"L139"},
-  realizado:{label:"Realizado",cls:"info",gel:"L132"},
-  cancelado:{label:"Cancelado",cls:"bad",gel:"L106"}
+  posible:{label:"Posible",cls:"idea"},
+  reserva:{label:"En reserva",cls:"warn"},
+  confirmado:{label:"Confirmado",cls:"ok"},
+  realizado:{label:"Realizado",cls:"info"},
+  cancelado:{label:"Cancelado",cls:"bad"}
 };
 const PAGOS = {pendiente:"Sin cobrar",parcial:"Cobrado en parte",pagado:"Cobrado"};
+const COBROS = {factura:"Con factura (autónomo)",nomina:"Nómina (me dan de alta)",otro:"Otro"};
 const CATS = {transporte:"Gasolina / transporte",km:"Kilometraje",peaje:"Peajes y parking",dietas:"Comidas y dietas",alojamiento:"Alojamiento",material:"Material y herramientas",formacion:"Formación",cuota:"Cuota de autónomos",gestoria:"Gestoría",otros:"Otros"};
 const PUESTOS = ["Técnico de iluminación","Jefe de iluminación","Operador de mesa","Programador","Montaje / desmontaje","Cañón de seguimiento","Rigger","Diseño de iluminación","Técnico de vídeo","Auxiliar"];
 const DEF_AJUSTES = {autonomo:true,irpf:15,iva:21,km:0.26,plazo:30,gcalOn:false,gcalNombre:"Mis Bolos",gcalId:""};
 const MESES = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
 const DIAS = ["dom","lun","mar","mié","jue","vie","sáb"];
 const LS_KEY = "mis-bolos-v1";
+const CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
 
 /* ---------- state ---------- */
 const S = {
@@ -234,7 +278,7 @@ const S = {
   loaded:false, storeKind:"cargando", note:""
 };
 const today = new Date();
-const UI = {tab:"resumen",mode:"mes",y:today.getFullYear(),m:today.getMonth(),bolosView:"lista",filtro:"todos",dia:null};
+const UI = {tab:"resumen",mode:"mes",y:today.getFullYear(),m:today.getMonth(),bolosView:"lista",filtro:"todos",dia:null,q:""};
 
 /* ---------- helpers ---------- */
 const $ = s => document.querySelector(s);
@@ -246,29 +290,54 @@ const parse = s => { const [y,m,d]=String(s).split("-").map(Number); return new 
 const num = v => { const n = parseFloat(String(v).replace(",",".")); return isFinite(n)?n:0; };
 const fmtEUR = new Intl.NumberFormat("es-ES",{style:"currency",currency:"EUR",maximumFractionDigits:2});
 const eur = n => fmtEUR.format(Math.round((n||0)*100)/100);
+const fmtN = n => String(Math.round(n*10)/10).replace(".",",");
 const fmtDate = s => { if(!s) return ""; const d=parse(s); return d.getDate()+" "+MESES[d.getMonth()].slice(0,3); };
 const daysBetween = (a,b) => Math.round((parse(b)-parse(a))/86400000);
 const newId = () => Date.now().toString(36)+Math.random().toString(36).slice(2,8);
-const slug = s => String(s||"").trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"").slice(0,80) || "sin-empresa";
+const norm = s => String(s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"");
+const slug = s => norm(String(s||"").trim()).replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"").slice(0,80) || "sin-empresa";
+const cap = s => s.charAt(0).toUpperCase()+s.slice(1);
+const suma = (arr,fn) => arr.reduce((s,x)=>s+fn(x),0);
+const plural = (n,uno,varios) => n+" "+(n===1?uno:varios);
 
-function toast(msg){ const t=$("#toast"); t.textContent=msg; t.hidden=false; clearTimeout(toast._t); toast._t=setTimeout(()=>t.hidden=true,2600); }
+function toast(msg,undo){
+  const t=$("#toast"); t.textContent="";
+  const s=document.createElement("span"); s.textContent=msg; t.appendChild(s);
+  if(undo){ const b=document.createElement("button"); b.type="button"; b.textContent="Deshacer"; b.addEventListener("click",()=>{ t.hidden=true; undo(); }); t.appendChild(b); }
+  t.hidden=false; clearTimeout(toast._t); toast._t=setTimeout(()=>t.hidden=true,undo?6500:2600);
+}
 
 /* ---------- domain ---------- */
-const bolosArr = () => [...S.bolos.entries()].map(([id,b])=>({id,...b}));
-const gastosArr = () => [...S.gastos.entries()].map(([id,g])=>({id,...g}));
-const importe = b => b.tipoPrecio==="jornada" ? num(b.precio)*Math.max(num(b.jornadas)||1,0) : num(b.precio);
+const bolosArr = () => [...S.bolos.entries()].map(([id,b])=>({...b,id})).filter(b=>typeof b.fecha==="string"&&b.fecha);
+const gastosArr = () => [...S.gastos.entries()].map(([id,g])=>({...g,id})).filter(g=>typeof g.fecha==="string"&&g.fecha);
+const baseDe = b => b.tipoPrecio==="jornada" ? num(b.precio)*Math.max(num(b.jornadas)||1,0) : num(b.precio);
+const importe = b => baseDe(b)+num(b.extras);
 const activo = b => b.estado==="confirmado" || b.estado==="realizado";
 const finDe = b => b.fechaFin && b.fechaFin>=b.fecha ? b.fechaFin : b.fecha;
-const hecho = b => b.estado==="realizado" || (b.estado==="confirmado" && finDe(b) < TODAY);
+/* a confirmed gig whose date has passed counts as done without having to mark it */
+const estadoEf = b => b.estado==="confirmado" && finDe(b)<TODAY ? "realizado" : (ESTADOS[b.estado] ? b.estado : "posible");
+const hecho = b => estadoEf(b)==="realizado";
+const modoCobro = b => COBROS[b.cobro] ? b.cobro : (S.ajustes.autonomo ? "factura" : "nomina");
+const facturada = b => !!(b.facturada || b.factura);
 const cobradoDe = b => b.pago==="pagado" ? importe(b) : b.pago==="parcial" ? Math.min(num(b.cobrado),importe(b)) : 0;
 const pendienteDe = b => activo(b) ? Math.max(importe(b)-cobradoDe(b),0) : 0;
+/* money owed for work already done (a future confirmed gig is not a debt yet) */
+const deudaDe = b => (hecho(b) || b.pago==="parcial") ? pendienteDe(b) : 0;
 const gastosDe = id => gastosArr().filter(g=>g.boloId===id);
 const plazoDe = nombre => { const e=S.empresas.get(slug(nombre)); return e && num(e.plazo)>0 ? num(e.plazo) : num(S.ajustes.plazo)||30; };
-const atrasado = b => hecho(b) && pendienteDe(b)>0 && daysBetween(finDe(b),TODAY) > plazoDe(b.empresa);
+const atrasado = b => hecho(b) && deudaDe(b)>0 && daysBetween(finDe(b),TODAY) > plazoDe(b.empresa);
 function inPeriod(s){ if(!s) return false; return UI.mode==="mes" ? s.startsWith(UI.y+"-"+pad(UI.m+1)) : s.startsWith(UI.y+"-"); }
 function periodLabel(){ return UI.mode==="mes" ? MESES[UI.m]+" "+UI.y : "Año "+UI.y; }
+function periodoTexto(){ return UI.mode==="mes" ? MESES[UI.m]+" de "+UI.y : String(UI.y); }
+function periodoActual(){ return UI.y===today.getFullYear() && (UI.mode==="anio" || UI.m===today.getMonth()); }
+function periodoPasado(){ return UI.y<today.getFullYear() || (UI.mode==="mes" && UI.y===today.getFullYear() && UI.m<today.getMonth()); }
 function empresasNombres(){ const set=new Map(); bolosArr().forEach(b=>{ if(b.empresa) set.set(slug(b.empresa),b.empresa); }); S.empresas.forEach((e,k)=>{ if(e.nombre && !set.has(k)) set.set(k,e.nombre); }); return [...set.values()].sort((a,b)=>a.localeCompare(b,"es")); }
 function lugares(){ const s=new Set(); bolosArr().forEach(b=>b.lugar&&s.add(b.lugar)); gastosArr().forEach(g=>g.lugar&&s.add(g.lugar)); return [...s].sort((a,b)=>a.localeCompare(b,"es")); }
+function ultimoDe(empresa,exceptId){
+  if(!String(empresa||"").trim()) return null;
+  const k=slug(empresa);
+  return bolosArr().filter(b=>b.empresa && slug(b.empresa)===k && b.id!==exceptId && num(b.precio)>0).sort((a,b)=>b.fecha.localeCompare(a.fecha))[0]||null;
+}
 function conflictos(){
   const act = bolosArr().filter(b=>b.estado!=="cancelado" && b.estado!=="posible" && finDe(b)>=TODAY);
   const out=[];
@@ -277,6 +346,25 @@ function conflictos(){
     if(a.fecha<=finDe(b) && b.fecha<=finDe(a)) out.push([a,b]);
   }
   return out;
+}
+function cuando(b){
+  const d=daysBetween(TODAY,b.fecha);
+  const dia=DIAS[parse(b.fecha).getDay()]+" "+fmtDate(b.fecha);
+  if(d<0) return "En curso · hasta el "+fmtDate(finDe(b));
+  if(d===0) return "Hoy · "+dia;
+  if(d===1) return "Mañana · "+dia;
+  return "En "+d+" días · "+dia;
+}
+/* things that need a decision from the user */
+function tareas(){
+  const out=[];
+  bolosArr().forEach(b=>{
+    const abierto = b.estado==="posible" || b.estado==="reserva";
+    if(abierto && finDe(b)<TODAY) out.push({tipo:"cerrar",orden:1,b});
+    else if(abierto && daysBetween(TODAY,b.fecha)<=7) out.push({tipo:"confirmar",orden:0,b});
+    else if(hecho(b) && modoCobro(b)==="factura" && !facturada(b) && b.pago!=="pagado") out.push({tipo:"factura",orden:2,b});
+  });
+  return out.sort((x,y)=>x.orden-y.orden || x.b.fecha.localeCompare(y.b.fecha));
 }
 
 /* ---------- storage layer: artifact db, or this device as fallback ---------- */
@@ -330,13 +418,13 @@ const Store = {
   }
 };
 
-
 /* ---------- Google Calendar (separate calendar, chosen by name) ---------- */
 const GC_SERVER = "Google Calendar";
 const GC_COLORS = {posible:"3",reserva:"5",confirmado:"10",realizado:"9"};
 const GC_PREFIX = {posible:"[Posible] ",reserva:"[Reserva] ",confirmado:"",realizado:""};
+const GC_FATAL = ["server_not_connected","needs_reauth","not_in_manifest","approval_required","blocked_by_policy","not_granted","consent_required"];
 const GCal = {
-  mcp:null, busy:false,
+  mcp:null,
   async get(){ if(this.mcp) return this.mcp; try{ this.mcp = window.claude ? await window.claude.use("mcp") : null; }catch(e){ this.mcp=null; } return this.mcp; },
   enabled(){ return !!(S.ajustes.gcalOn && S.ajustes.gcalId); },
   errText(e){
@@ -346,6 +434,7 @@ const GCal = {
     if(c==="not_in_manifest"||c==="approval_required"||c==="consent_required") return "Falta tu permiso para que la app use Google Calendar. Vuelve a intentarlo y pulsa Permitir.";
     if(c==="blocked_by_policy") return "Tu organización no permite usar Google Calendar aquí.";
     if(c==="server_unavailable") return "Google Calendar no responde ahora. Inténtalo en un rato.";
+    if(c==="not_granted") return "Esta vista no puede usar Google Calendar. Abre la app desde Claude.";
     return "No se pudo actualizar Google Calendar"+(c?" ("+c+")":"")+".";
   },
   async call(tool,input){ const m=await this.get(); if(!m) throw {code:"not_granted"}; const r=await m.callTool(GC_SERVER,tool,input); return r ? r.payload : null; },
@@ -358,17 +447,18 @@ const GCal = {
   },
   addDay(s){ const d=parse(s); d.setDate(d.getDate()+1); return iso(d); },
   eventFor(b){
-    const titulo=(GC_PREFIX[b.estado]||"")+(b.evento||b.empresa||"Bolo")+(b.evento&&b.empresa?" · "+b.empresa:"");
+    const ef=estadoEf(b);
+    const titulo=(GC_PREFIX[ef]||"")+(b.evento||b.empresa||"Bolo")+(b.evento&&b.empresa?" · "+b.empresa:"");
     const lines=[b.empresa&&"Empresa: "+b.empresa,b.lugar&&"Lugar: "+b.lugar,b.puesto&&"Puesto: "+b.puesto,
       importe(b)?"Precio: "+eur(importe(b))+(b.tipoPrecio==="jornada"?" ("+eur(num(b.precio))+"/jornada)":""):"",
-      "Estado: "+((ESTADOS[b.estado]||{}).label||""),b.notas&&"Notas: "+b.notas,"Apuntado en Mis Bolos"].filter(Boolean);
+      "Estado: "+ESTADOS[ef].label,b.notas&&"Notas: "+b.notas,"Apuntado en Mis Bolos"].filter(Boolean);
     const ev={calendarId:S.ajustes.gcalId,summary:titulo,description:lines.map(esc).join("<br>"),location:b.lugar||"",
-      colorId:GC_COLORS[b.estado]||"10",notificationLevel:"NONE"};
+      colorId:GC_COLORS[ef]||"10",notificationLevel:"NONE"};
     const fin=finDe(b);
     if(b.hora){
       ev.startTime=b.fecha+"T"+b.hora+":00";
       if(fin>b.fecha) ev.endTime=fin+"T23:59:00";
-      else { const [h,m]=b.hora.split(":").map(Number); const eh=Math.min(h+8,23); ev.endTime=b.fecha+"T"+pad(eh)+":"+(eh===23&&h+8>23?"59":pad(m))+":00"; }
+      else { const [h,m]=b.hora.split(":").map(Number); const tarde=h+8>23; ev.endTime=b.fecha+"T"+(tarde?"23:59":pad(h+8)+":"+pad(m))+":00"; }
     } else { ev.allDay=true; ev.startTime=b.fecha+"T00:00:00"; ev.endTime=this.addDay(fin)+"T00:00:00"; }
     return ev;
   },
@@ -377,36 +467,65 @@ const GCal = {
   async sync(b){
     if(!this.enabled()) return b.gcalId||"";
     if(b.estado==="cancelado" || b._borrado){
-      if(b.gcalId){ try{ await this.call("delete_event",{calendarId:S.ajustes.gcalId,eventId:b.gcalId,notificationLevel:"NONE"}); }catch(e){ if(e&&e.code!=="tool_error") throw e; } }
+      if(b.gcalId){ try{ await this.call("delete_event",{calendarId:S.ajustes.gcalId,eventId:b.gcalId,notificationLevel:"NONE"}); }catch(e){ if(!e||e.code!=="tool_error") throw e; } }
       return "";
     }
     const ev=this.eventFor(b);
     if(b.gcalId){
       try{ await this.call("update_event",{...ev,eventId:b.gcalId}); return b.gcalId; }
-      catch(e){ if(!e||e.code!=="tool_error") throw e; /* event was removed by hand: create it again */ }
+      catch(e){ if(!e||e.code!=="tool_error") throw e; /* the event was removed by hand: create it again */ }
     }
-    const p=await this.call("create_event",ev);
-    return this.idFrom(p);
+    return this.idFrom(await this.call("create_event",ev));
   },
   /* sync one gig after a save, then remember its event id */
   async after(id,b){
     if(!this.enabled()) return;
     try{
       const gid=await this.sync(b);
-      if(!b._borrado && gid!==(b.gcalId||"")){ const cur=S.bolos.get(id)||b; const o={...cur,gcalId:gid}; delete o._borrado; await Store.put("bolos",id,o); }
+      if(!b._borrado && gid!==(b.gcalId||"")){ const cur=S.bolos.get(id); if(cur) await Store.put("bolos",id,{...cur,gcalId:gid}); }
     }catch(e){ toast(this.errText(e)); }
   },
   async syncAll(onProgress){
     const all=bolosArr().filter(b=>b.estado!=="cancelado"||b.gcalId);
     let n=0, fails=0, lastErr=null;
     for(const b of all){
-      try{ const gid=await this.sync(b); if(gid!==(b.gcalId||"")){ const o={...S.bolos.get(b.id),gcalId:gid}; await Store.put("bolos",b.id,o); } n++; }
-      catch(e){ fails++; lastErr=e; if(e&&["server_not_connected","needs_reauth","not_in_manifest","approval_required","blocked_by_policy","not_granted","consent_required"].includes(e.code)) break; }
+      try{ const gid=await this.sync(b); if(gid!==(b.gcalId||"")){ const cur=S.bolos.get(b.id); if(cur) await Store.put("bolos",b.id,{...cur,gcalId:gid}); } n++; }
+      catch(e){ fails++; lastErr=e; if(e&&GC_FATAL.includes(e.code)) break; }
       if(onProgress) onProgress(n,all.length);
     }
     return {n,fails,lastErr,total:all.length};
   }
 };
+
+/* ---------- one-tap changes, with undo ---------- */
+async function quick(id,accion){
+  const b=S.bolos.get(id); if(!b) return;
+  const o={...b,actualizado:new Date().toISOString()}; let msg="";
+  if(accion==="confirmar"){ o.estado="confirmado"; msg="Bolo confirmado"; }
+  else if(accion==="realizado"){ o.estado="realizado"; msg="Marcado como realizado"; }
+  else if(accion==="cancelar"){ o.estado="cancelado"; msg="Bolo cancelado"; }
+  else if(accion==="cobrado"){ o.pago="pagado"; o.cobrado=importe(b); o.fechaCobro=TODAY; if(o.estado==="confirmado" && finDe(o)<=TODAY) o.estado="realizado"; msg="Marcado como cobrado"; }
+  else if(accion==="facturada"){ o.facturada=true; msg="Factura apuntada como enviada"; }
+  else if(accion==="sinfactura"){ o.cobro="otro"; msg="Apuntado: este bolo no lleva factura"; }
+  else return;
+  if(!(await Store.put("bolos",id,o))) return;
+  if(o.estado!==b.estado) GCal.after(id,o);
+  toast(msg,async()=>{
+    const cur=S.bolos.get(id)||o; const back={...b};
+    if("gcalId" in cur) back.gcalId=cur.gcalId;
+    if(await Store.put("bolos",id,back)){ toast("Deshecho"); if(back.estado!==o.estado) GCal.after(id,back); }
+  });
+}
+function quickButtons(b){
+  const q=[];
+  if(b.estado==="posible"||b.estado==="reserva") q.push(["confirmar","Confirmar","ok"]);
+  if(activo(b) && b.pago!=="pagado") q.push(["cobrado","Cobrado","ok"]);
+  if(activo(b) && modoCobro(b)==="factura" && !facturada(b)) q.push(["facturada","Factura enviada",""]);
+  if(b.estado==="confirmado" && b.fecha<=TODAY) q.push(["realizado","Realizado",""]);
+  if(b.estado!=="cancelado" && b.estado!=="realizado") q.push(["cancelar","Cancelar bolo","no"]);
+  return q;
+}
+const qbtn = (id,accion,label,cls,close) => `<button class="qbtn ${cls||""}" type="button" data-quick="${id}|${accion}"${close?' data-close="1"':""}>${label}</button>`;
 
 /* ---------- render ---------- */
 function renderBanner(){
@@ -419,150 +538,268 @@ function render(){
   $("#period-label").textContent = periodLabel();
   $("#mode-mes").setAttribute("aria-pressed",UI.mode==="mes");
   $("#mode-anio").setAttribute("aria-pressed",UI.mode==="anio");
+  $("#hoy").hidden = periodoActual();
   document.querySelectorAll(".tabbar button").forEach(b=>b.setAttribute("aria-current",b.dataset.tab===UI.tab?"page":"false"));
   $("#fab-label").textContent = UI.tab==="gastos" ? "Nuevo gasto" : "Nuevo bolo";
   $("#fab").hidden = UI.tab==="empresas";
   renderBanner();
   const v=$("#view");
   if(!S.loaded){ v.innerHTML='<div class="empty"><strong>Cargando tus bolos…</strong>Un momento.</div>'; return; }
+  const ae=document.activeElement; const keep = ae && ae.id==="q" ? [ae.selectionStart,ae.selectionEnd] : null;
   v.innerHTML = UI.tab==="resumen" ? vResumen() : UI.tab==="bolos" ? vBolos() : UI.tab==="gastos" ? vGastos() : vEmpresas();
+  if(keep){ const q=$("#q"); if(q){ q.focus(); try{ q.setSelectionRange(keep[0],keep[1]); }catch(e){} } }
 }
 
-const gelTag = e => '<span class="chip c-'+e.cls+'"><i class="dot d-'+e.cls+'"></i>'+e.label+'</span>';
-function chipEstado(b){ return gelTag(ESTADOS[b.estado]||ESTADOS.posible); }
+const estadoChip = e => `<span class="chip c-${e.cls}"><i class="dot d-${e.cls}"></i>${e.label}</span>`;
+function chipEstado(b){ return estadoChip(ESTADOS[estadoEf(b)]); }
 function chipPago(b){
   if(!activo(b)) return "";
-  if(b.pago==="pagado") return '<span class="chip c-ok">Cobrado</span>';
-  if(atrasado(b)) return '<span class="chip c-bad">Cobro atrasado</span>';
-  if(b.pago==="parcial") return '<span class="chip c-warn">Cobrado en parte</span>';
-  return hecho(b) ? '<span class="chip c-warn">Sin cobrar</span>' : "";
+  let h="";
+  if(b.pago==="pagado") h='<span class="chip c-ok">Cobrado</span>';
+  else if(atrasado(b)) h='<span class="chip c-bad">Cobro atrasado</span>';
+  else if(b.pago==="parcial") h='<span class="chip c-warn">Cobrado en parte</span>';
+  else if(hecho(b)) h='<span class="chip c-warn">Sin cobrar</span>';
+  if(hecho(b) && b.pago!=="pagado" && modoCobro(b)==="factura" && !facturada(b)) h+='<span class="chip c-plain">Sin factura</span>';
+  return h;
+}
+function chipsDeuda(b){
+  const d=daysBetween(finDe(b),TODAY);
+  let h = atrasado(b) ? `<span class="chip c-bad">Hace ${d} días · atrasado</span>` : `<span class="chip c-plain">${d<=0?"Hoy":d===1?"Ayer":"Hace "+d+" días"}</span>`;
+  if(b.pago==="parcial") h+='<span class="chip c-warn">Cobrado en parte</span>';
+  if(modoCobro(b)==="factura" && !facturada(b)) h+='<span class="chip c-plain">Sin factura</span>';
+  return h;
 }
 function boloRow(b,opts={}){
-  const d=parse(b.fecha); const g=gastosDe(b.id).reduce((s,x)=>s+num(x.importe),0);
+  const d=parse(b.fecha); const g=suma(gastosDe(b.id),x=>num(x.importe));
+  const otroAnio = opts.showMonth && d.getFullYear()!==today.getFullYear() ? d.getFullYear()+" · " : "";
   const dias = b.fechaFin && b.fechaFin>b.fecha ? " → "+fmtDate(b.fechaFin) : "";
-  const sub=[b.empresa, b.lugar].filter(Boolean).join(" · ");
-  const quick = opts.quickPay && pendienteDe(b)>0 ? '<button class="mini-btn go" type="button" data-cobrar="'+b.id+'" aria-label="Marcar como cobrado" title="Marcar como cobrado"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></button>' : "";
-  return '<div class="rowwrap"><button class="row'+(b.estado==="cancelado"?" cancel":"")+'" type="button" data-bolo="'+b.id+'">'+
-    '<div class="datebox"><div class="d">'+d.getDate()+'</div><div class="w">'+(UI.mode==="anio"||opts.showMonth?MESES[d.getMonth()].slice(0,3):DIAS[d.getDay()])+'</div></div>'+
-    '<div class="row-body"><div class="row-title">'+esc(b.evento||b.empresa||"Bolo sin nombre")+'</div>'+
-    '<div class="row-sub">'+esc(sub||b.puesto||"")+(dias?esc(dias):"")+(b.hora?" · "+esc(b.hora):"")+'</div>'+
-    '<div class="chips">'+chipEstado(b)+chipPago(b)+'</div></div>'+
-    '<div class="row-amt"><div class="a num">'+eur(importe(b))+'</div>'+(g?'<div class="b num">−'+eur(g)+' gastos</div>':"")+
-    (opts.showPend && pendienteDe(b)>0 && pendienteDe(b)<importe(b)?'<div class="b num">faltan '+eur(pendienteDe(b))+'</div>':"")+'</div></button>'+quick+'</div>';
+  const sub = otroAnio+([b.empresa,b.lugar].filter(Boolean).join(" · ")||b.puesto||"")+dias+(b.hora?" · "+b.hora:"");
+  const debe = deudaDe(b);
+  const quickPay = opts.quickPay && debe>0 ? `<button class="mini-btn go" type="button" data-quick="${b.id}|cobrado" aria-label="Marcar como cobrado" title="Marcar como cobrado">${CHECK}</button>` : "";
+  return `<div class="rowwrap"><button class="row${b.estado==="cancelado"?" cancel":""}" type="button" data-bolo="${b.id}">
+    <div class="datebox"><div class="d">${d.getDate()}</div><div class="w">${UI.mode==="anio"||opts.showMonth?MESES[d.getMonth()].slice(0,3):DIAS[d.getDay()]}</div></div>
+    <div class="row-body"><div class="row-title">${esc(b.evento||b.empresa||"Bolo sin nombre")}</div>
+      <div class="row-sub">${esc(sub)}</div>
+      <div class="chips">${opts.deuda?chipsDeuda(b):chipEstado(b)+chipPago(b)}</div></div>
+    <div class="row-amt"><div class="a num">${eur(importe(b))}</div>${g?`<div class="b num">−${eur(g)} gastos</div>`:""}${opts.showPend&&debe>0&&debe<importe(b)?`<div class="b num">faltan ${eur(debe)}</div>`:""}</div>
+  </button>${quickPay}</div>`;
+}
+
+function calcPeriodo(){
+  const bs=bolosArr().filter(b=>inPeriod(b.fecha));
+  const act=bs.filter(activo);
+  const trabajado=suma(act.filter(hecho),importe), porVenir=suma(act.filter(b=>!hecho(b)),importe);
+  const aire=bs.filter(b=>b.estado==="posible"||b.estado==="reserva");
+  return {bs,act,trabajado,porVenir,ingresos:trabajado+porVenir,
+    cobrado:suma(act,cobradoDe),
+    gastos:suma(gastosArr().filter(g=>inPeriod(g.fecha)),g=>num(g.importe)),
+    jornadas:suma(act,b=>num(b.jornadas)||1),
+    aire,aireImp:suma(aire,importe),
+    facturable:suma(act.filter(b=>modoCobro(b)==="factura"),importe)};
+}
+
+function proximoCard(b){
+  const e=S.empresas.get(slug(b.empresa))||{};
+  const contacto=[e.contacto,e.telefono].filter(Boolean).join(" · ");
+  const l1=[b.empresa,b.puesto].filter(Boolean).join(" · ");
+  const l2=[b.hora?"Citación a las "+b.hora:"",b.lugar].filter(Boolean).join(" · ");
+  const mapa = b.lugar ? `<a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(b.lugar)}" target="_blank" rel="noopener">Cómo llegar</a>` : "";
+  return `<div class="card nextcard">
+    <button class="nextmain" type="button" data-bolo="${b.id}">
+      <div class="when">${esc(cuando(b))}${b.fechaFin&&b.fechaFin>b.fecha&&b.fecha>=TODAY?" → "+esc(fmtDate(b.fechaFin)):""}</div>
+      <div class="nexttitle">${esc(b.evento||b.empresa||"Bolo")}</div>
+      ${l1?`<div class="nextmeta">${esc(l1)}</div>`:""}${l2?`<div class="nextmeta">${esc(l2)}</div>`:""}
+      <div class="chips">${chipEstado(b)}<span class="chip c-plain num">${eur(importe(b))}</span></div>
+    </button>
+    ${mapa||contacto?`<div class="nextfoot">${mapa}${contacto?`<span class="muted">Contacto: <span class="sel">${esc(contacto)}</span></span>`:""}</div>`:""}
+  </div>`;
+}
+function taskHTML(t){
+  const b=t.b, id=b.id; let q="", btns="";
+  if(t.tipo==="confirmar"){ const d=daysBetween(TODAY,b.fecha); q=(d<=0?"Es hoy":d===1?"Es mañana":"Es en "+d+" días")+" y sigue sin confirmar."; btns=qbtn(id,"confirmar","Confirmado","ok")+qbtn(id,"cancelar","No sale","no"); }
+  else if(t.tipo==="cerrar"){ q="Ya pasó la fecha y no estaba confirmado. ¿Lo hiciste?"; btns=qbtn(id,"realizado","Sí, lo hice","ok")+qbtn(id,"cancelar","No salió","no"); }
+  else { q="Falta enviar la factura."; btns=qbtn(id,"facturada","Factura enviada","ok")+qbtn(id,"sinfactura","No lleva factura",""); }
+  return `<div class="task">${boloRow(b,{showMonth:true})}<div class="task-actions"><span class="q">${q}</span>${btns}</div></div>`;
+}
+function tablaFuturo(){
+  const rows=[];
+  for(let i=0;i<6;i++){
+    const d=new Date(today.getFullYear(),today.getMonth()+i,1), pre=d.getFullYear()+"-"+pad(d.getMonth()+1);
+    const bs=bolosArr().filter(b=>b.fecha.startsWith(pre));
+    const conf=suma(bs.filter(activo),importe), aire=suma(bs.filter(b=>b.estado==="posible"||b.estado==="reserva"),importe);
+    if(conf||aire) rows.push({pre,label:cap(MESES[d.getMonth()])+(d.getFullYear()!==today.getFullYear()?" "+d.getFullYear():""),conf,aire});
+  }
+  if(!rows.length || (rows.length===1 && periodoActual() && rows[0].pre===TODAY.slice(0,7))) return "";
+  return `<h2>Lo que viene, mes a mes</h2><div class="card tblwrap"><table class="tbl"><thead><tr><th>Mes</th><th>Confirmado</th><th>Sin confirmar</th></tr></thead><tbody>
+    ${rows.map(r=>`<tr><td><button class="linkbtn" type="button" data-ym="${r.pre}">${r.label}</button></td><td><strong>${r.conf?eur(r.conf):"—"}</strong></td><td class="dim">${r.aire?eur(r.aire):"—"}</td></tr>`).join("")}
+    <tr class="tot"><td>Total</td><td>${eur(suma(rows,r=>r.conf))}</td><td class="dim">${eur(suma(rows,r=>r.aire))}</td></tr></tbody></table></div>`;
+}
+function tablaMeses(){
+  const rows=[];
+  for(let m=0;m<12;m++){
+    const pre=UI.y+"-"+pad(m+1);
+    const ing=suma(bolosArr().filter(b=>activo(b)&&b.fecha.startsWith(pre)),importe);
+    const gas=suma(gastosArr().filter(g=>g.fecha.startsWith(pre)),g=>num(g.importe));
+    if(ing||gas) rows.push({pre,m,ing,gas});
+  }
+  if(!rows.length) return "";
+  const tI=suma(rows,r=>r.ing), tG=suma(rows,r=>r.gas);
+  return `<h2>Mes a mes</h2><div class="card tblwrap"><table class="tbl"><thead><tr><th>Mes</th><th>Ingresos</th><th>Gastos</th><th>Te queda</th></tr></thead><tbody>
+    ${rows.map(r=>`<tr><td><button class="linkbtn" type="button" data-ym="${r.pre}">${cap(MESES[r.m])}</button></td><td>${eur(r.ing)}</td><td class="dim">${r.gas?"−"+eur(r.gas):"—"}</td><td><strong>${eur(r.ing-r.gas)}</strong></td></tr>`).join("")}
+    <tr class="tot"><td>Total</td><td>${eur(tI)}</td><td>${tG?"−"+eur(tG):"—"}</td><td>${eur(tI-tG)}</td></tr></tbody></table></div>`;
+}
+function tablaTrimestres(){
+  const A=S.ajustes, rows=[];
+  for(let q=0;q<4;q++){
+    const enQ=f=>{ const m=Number(f.slice(5,7)); return f.startsWith(UI.y+"-") && m>q*3 && m<=q*3+3; };
+    const fac=suma(bolosArr().filter(b=>activo(b)&&modoCobro(b)==="factura"&&enQ(b.fecha)),importe);
+    if(fac) rows.push({q,fac});
+  }
+  if(!rows.length) return "";
+  return `<h2>Por trimestre (lo que va con factura)</h2><div class="card tblwrap"><table class="tbl"><thead><tr><th>Trim.</th><th>Facturado</th><th>IVA ${num(A.iva)} %</th><th>IRPF ${num(A.irpf)} %</th></tr></thead><tbody>
+    ${rows.map(r=>`<tr><td>T${r.q+1}</td><td>${eur(r.fac)}</td><td>${eur(r.fac*num(A.iva)/100)}</td><td class="dim">${eur(r.fac*num(A.irpf)/100)}</td></tr>`).join("")}</tbody></table></div>
+    <p class="hint" style="margin:8px 4px 0">Orientativo, según la fecha de cada bolo. El IVA es lo que cobras de más y luego ingresas a Hacienda; el IRPF es lo que la empresa te retiene.</p>`;
 }
 
 function vResumen(){
-  const A=S.ajustes;
-  const bs = bolosArr().filter(b=>inPeriod(b.fecha));
-  const act = bs.filter(activo);
-  const ingresos = act.reduce((s,b)=>s+importe(b),0);
-  const cobrado = act.reduce((s,b)=>s+cobradoDe(b),0);
-  const gastos = gastosArr().filter(g=>inPeriod(g.fecha)).reduce((s,g)=>s+num(g.importe),0);
-  const beneficio = ingresos-gastos;
-  const jornadas = act.reduce((s,b)=>s+(num(b.jornadas)||1),0);
-  const potencial = bs.filter(b=>b.estado==="posible"||b.estado==="reserva");
-  const potImp = potencial.reduce((s,b)=>s+importe(b),0);
-  const irpf = A.autonomo ? ingresos*num(A.irpf)/100 : 0;
-  const iva = A.autonomo ? ingresos*num(A.iva)/100 : 0;
-  let h='';
-  if(!bolosArr().length && !gastosArr().length){
-    h+='<div class="empty" style="margin-bottom:16px"><strong>Apunta tu primer bolo</strong>Pulsa «Nuevo bolo» abajo: empresa, fecha, lugar, precio pactado y estado. Los gastos los añades en la pestaña Gastos o dentro de cada bolo.</div>';
+  const A=S.ajustes, P=calcPeriodo(), pasado=periodoPasado();
+  const queda=P.ingresos-P.gastos, irpf=P.facturable*num(A.irpf)/100, iva=P.facturable*num(A.iva)/100;
+  let h="";
+  if(!S.bolos.size && !S.gastos.size){
+    h+=`<div class="empty" style="margin-bottom:16px"><strong>Apunta tu primer bolo</strong>Pulsa «Nuevo bolo»: con la empresa, la fecha y el precio ya vale. Aquí verás lo que vas a ganar, lo que te deben y lo que tienes pendiente.</div>`;
   }
-  h+='<h2>'+esc(periodLabel())+'</h2><div class="card hero">'+
-    '<div class="hero-main"><div><div class="cap">Te queda (ingresos − gastos)</div><div class="big num" style="color:'+(beneficio<0?"var(--bad)":"var(--fg)")+'">'+eur(beneficio)+'</div></div>'+
-    '<div class="small muted">'+act.length+' bolo'+(act.length===1?"":"s")+' · '+(Math.round(jornadas*10)/10)+' jornada'+(jornadas===1?"":"s")+'</div></div>'+
-    '<div class="ledger">'+
-      '<div><span>Ingresos</span><span class="num">'+eur(ingresos)+'</span></div>'+
-      '<div><span>Ya cobrado</span><span class="num pos">'+eur(cobrado)+'</span></div>'+
-      '<div><span>Gastos</span><span class="num'+(gastos?" neg":"")+'">'+(gastos?"−":"")+eur(gastos)+'</span></div>'+
-      '<div><span>Media por jornada</span><span class="num">'+(jornadas?eur(ingresos/jornadas):"—")+'</span></div>'+
-    '</div>'+
-    (A.autonomo && ingresos?'<div class="ledger sub"><div><span>Retención IRPF '+num(A.irpf)+' %</span><span class="num">−'+eur(irpf)+'</span></div>'+
-      '<div><strong>Neto tras IRPF y gastos</strong><span class="num"><strong>'+eur(beneficio-irpf)+'</strong></span></div>'+
-      '<div><span>IVA a apartar ('+num(A.iva)+' %)</span><span class="num">'+eur(iva)+'</span></div></div>':"")+
-    (potencial.length?'<div class="small muted">Y en el aire: '+potencial.length+' bolo'+(potencial.length===1?"":"s")+' posible'+(potencial.length===1?"":"s")+' o en reserva por <span class="num">'+eur(potImp)+'</span>.</div>':"")+
-  '</div>';
 
-  // pendiente de cobro (global)
-  const pend = bolosArr().filter(b=>pendienteDe(b)>0 && (hecho(b)||b.pago==="parcial")).sort((a,b)=>a.fecha.localeCompare(b.fecha));
-  const totPend = pend.reduce((s,b)=>s+pendienteDe(b),0);
-  h+='<h2>Pendiente de cobro · <span class="num">'+eur(totPend)+'</span></h2>';
-  h+= pend.length ? '<div class="stack">'+pend.map(b=>boloRow(b,{quickPay:true,showMonth:true,showPend:true})).join("")+'</div>'
-    : '<div class="empty">Nada pendiente. Todo lo trabajado está cobrado.</div>';
+  /* next gig */
+  const futuros=bolosArr().filter(b=>finDe(b)>=TODAY && b.estado!=="cancelado").sort((a,b)=>a.fecha.localeCompare(b.fecha));
+  const prox=futuros.find(b=>b.estado!=="posible");
+  if(prox) h+=`<h2>Tu próximo bolo</h2>${proximoCard(prox)}`;
 
-  // próximos
-  const prox = bolosArr().filter(b=>finDe(b)>=TODAY && b.estado!=="cancelado").sort((a,b)=>a.fecha.localeCompare(b.fecha)).slice(0,6);
-  const conf = conflictos();
-  h+='<h2>Próximos bolos</h2>';
-  if(conf.length) h+='<div class="banner warn">Ojo: tienes bolos que se solapan: '+conf.map(([a,b])=>esc(fmtDate(a.fecha))+' ('+esc(a.evento||a.empresa)+' y '+esc(b.evento||b.empresa)+')').join("; ")+'.</div>';
-  h+= prox.length ? '<div class="stack">'+prox.map(b=>boloRow(b,{showMonth:true})).join("")+'</div>' : '<div class="empty">No tienes bolos apuntados a partir de hoy.</div>';
+  /* the selected month or year */
+  h+=`<h2>${esc(periodLabel())}</h2><div class="card hero">
+    <div class="hero-main"><div><div class="cap">${pasado?"Ganaste":"Vas a ganar"}</div><div class="big">${eur(P.ingresos)}</div></div>
+      <div class="small muted">${plural(P.act.length,"bolo","bolos")} · ${fmtN(P.jornadas)} ${P.jornadas===1?"jornada":"jornadas"}</div></div>
+    <div class="ledger">
+      ${pasado?"":`<div><span>Ya trabajado</span><span class="num">${eur(P.trabajado)}</span></div><div><span>Confirmado por hacer</span><span class="num">${eur(P.porVenir)}</span></div>`}
+      <div><span>Gastos</span><span class="num${P.gastos?" neg":""}">${P.gastos?"−":""}${eur(P.gastos)}</span></div>
+      <div><strong>Te queda</strong><span class="num"><strong>${eur(queda)}</strong></span></div>
+    </div>
+    <div class="ledger sub">
+      <div><span>De eso, ya cobrado</span><span class="num pos">${eur(P.cobrado)}</span></div>
+      <div><span>Media por jornada</span><span class="num">${P.jornadas?eur(P.ingresos/P.jornadas):"—"}</span></div>
+      ${P.aire.length?`<div><span>Sin confirmar (${plural(P.aire.length,"bolo","bolos")})</span><span class="num">${eur(P.aireImp)}</span></div>`:""}
+    </div>
+    ${P.facturable?`<div class="ledger sub">
+      ${P.facturable<P.ingresos?`<div><span>De eso, con factura</span><span class="num">${eur(P.facturable)}</span></div>`:""}
+      <div><span>Retención IRPF (${num(A.irpf)} %)</span><span class="num">−${eur(irpf)}</span></div>
+      <div><strong>Limpio tras IRPF y gastos</strong><span class="num"><strong>${eur(queda-irpf)}</strong></span></div>
+      <div><span>IVA a apartar para Hacienda (${num(A.iva)} %)</span><span class="num">${eur(iva)}</span></div></div>`:""}
+  </div>`;
 
-  // por empresa en el periodo
-  const porEmp = new Map();
-  act.forEach(b=>{ const k=b.empresa||"Sin empresa"; porEmp.set(k,(porEmp.get(k)||0)+importe(b)); });
-  if(porEmp.size){
-    const max=Math.max(...porEmp.values());
-    h+='<h2>Quién te ha dado trabajo</h2><div class="card" style="padding:4px 14px">'+[...porEmp.entries()].sort((a,b)=>b[1]-a[1]).map(([k,v])=>
-      '<div style="padding:10px 0;border-bottom:1px solid var(--line)"><div style="display:flex;justify-content:space-between;gap:10px"><span>'+esc(k)+'</span><span class="num">'+eur(v)+'</span></div><div class="bar"><i style="width:'+(max?Math.round(v/max*100):0)+'%"></i></div></div>').join("")+'</div>';
+  /* money owed, all dates */
+  const deben=bolosArr().filter(b=>deudaDe(b)>0).sort((a,b)=>a.fecha.localeCompare(b.fecha));
+  h+=`<h2>Te deben</h2>`;
+  if(!deben.length) h+=`<div class="empty">Nada pendiente. Todo lo que has trabajado está cobrado.</div>`;
+  else {
+    const tarde=deben.filter(atrasado), porEmp=new Map();
+    deben.forEach(b=>{ const k=b.empresa||"Sin empresa"; porEmp.set(k,(porEmp.get(k)||0)+deudaDe(b)); });
+    h+=`<div class="card hero">
+      <div class="hero-main"><div><div class="cap">Trabajo hecho y sin cobrar</div><div class="big">${eur(suma(deben,deudaDe))}</div></div><div class="small muted">${plural(deben.length,"bolo","bolos")}</div></div>
+      ${tarde.length?`<div class="debt-late">${eur(suma(tarde,deudaDe))} ya tendrían que estar pagados (${plural(tarde.length,"bolo","bolos")}).</div>`:""}
+      ${porEmp.size>1?`<div class="ledger">${[...porEmp.entries()].sort((a,b)=>b[1]-a[1]).map(([k,v])=>`<div><span>${esc(k)}</span><span class="num">${eur(v)}</span></div>`).join("")}</div>`:""}
+    </div>
+    <div class="stack" style="margin-top:8px">${deben.map(b=>boloRow(b,{quickPay:true,showMonth:true,showPend:true,deuda:true})).join("")}</div>
+    <p class="hint" style="margin:8px 4px 0">Pulsa ✓ cuando te paguen un bolo.</p>`;
+  }
+
+  /* decisions waiting */
+  const ts=tareas();
+  if(ts.length){
+    h+=`<h2>Por hacer</h2><div class="stack">${ts.slice(0,8).map(taskHTML).join("")}</div>`;
+    if(ts.length>8) h+=`<p class="hint" style="margin:8px 4px 0">Y ${ts.length-8} más. Irán apareciendo según resuelvas estos.</p>`;
+  }
+
+  /* upcoming */
+  const resto=futuros.filter(b=>!prox||b.id!==prox.id).slice(0,6), conf=conflictos();
+  if(resto.length||conf.length){
+    h+=`<h2>${prox?"Después":"Próximos bolos"}</h2>`;
+    if(conf.length) h+=`<div class="banner warn">Ojo, se te solapan: ${conf.map(([a,b])=>esc(fmtDate(a.fecha)+" ("+(a.evento||a.empresa)+" y "+(b.evento||b.empresa)+")")).join("; ")}.</div>`;
+    if(resto.length) h+=`<div class="stack">${resto.map(b=>boloRow(b,{showMonth:true})).join("")}</div>`;
+  }
+  h+=tablaFuturo();
+  if(UI.mode==="anio") h+=tablaMeses()+tablaTrimestres();
+
+  /* who gave work in the period */
+  const porEmpP=new Map();
+  P.act.forEach(b=>{ const k=b.empresa||"Sin empresa"; porEmpP.set(k,(porEmpP.get(k)||0)+importe(b)); });
+  if(porEmpP.size){
+    const max=Math.max(...porEmpP.values());
+    h+=`<h2>Quién te ha dado trabajo en ${esc(periodoTexto())}</h2><div class="card" style="padding:4px 14px 10px">${[...porEmpP.entries()].sort((a,b)=>b[1]-a[1]).map(([k,v])=>
+      `<div style="padding:10px 0 0"><div style="display:flex;justify-content:space-between;gap:10px"><span>${esc(k)}</span><span class="num">${eur(v)}</span></div><div class="bar"><i style="width:${max?Math.round(v/max*100):0}%"></i></div></div>`).join("")}</div>`;
   }
   return h;
 }
 
 function vBolos(){
-  let h='<div class="toolbar"><div class="seg" role="group" aria-label="Vista">'+
-    '<button type="button" data-bview="lista" aria-pressed="'+(UI.bolosView==="lista")+'">Lista</button>'+
-    '<button type="button" data-bview="cal" aria-pressed="'+(UI.bolosView==="cal")+'"'+(UI.mode==="anio"?" disabled":"")+'>Calendario</button></div></div>';
-  const filtros=[["todos","Todos"],["confirmado","Confirmados"],["reserva","En reserva"],["posible","Posibles"],["realizado","Realizados"],["sincobrar","Sin cobrar"],["cancelado","Cancelados"]];
+  return `<input class="search" id="q" type="search" placeholder="Buscar por evento, empresa o lugar" value="${esc(UI.q)}" aria-label="Buscar bolos" autocomplete="off"><div id="bolos-body">${bolosBody()}</div>`;
+}
+function bolosBody(){
+  if(UI.q.trim()){
+    const q=norm(UI.q.trim());
+    const bs=bolosArr().filter(b=>norm([b.evento,b.empresa,b.lugar,b.puesto,b.notas,b.factura].join(" ")).includes(q)).sort((a,b)=>b.fecha.localeCompare(a.fecha));
+    if(!bs.length) return `<div class="empty"><strong>Sin resultados</strong>No hay ningún bolo con «${esc(UI.q.trim())}».</div>`;
+    return `<p class="small muted" style="margin:0 4px 10px">${plural(bs.length,"resultado","resultados")} en todas las fechas</p><div class="stack">${bs.slice(0,100).map(b=>boloRow(b,{showMonth:true})).join("")}</div>`;
+  }
+  let h=`<div class="toolbar"><div class="seg" role="group" aria-label="Vista">
+    <button type="button" data-bview="lista" aria-pressed="${UI.bolosView==="lista"}">Lista</button>
+    <button type="button" data-bview="cal" aria-pressed="${UI.bolosView==="cal"}"${UI.mode==="anio"?" disabled":""}>Calendario</button></div></div>`;
   let bs = bolosArr().filter(b=>inPeriod(b.fecha)).sort((a,b)=>a.fecha.localeCompare(b.fecha));
   if(UI.bolosView==="cal" && UI.mode==="mes"){
-    h+=calendar(bs);
+    h+=calendar();
     if(UI.dia){
-      const dd = bs.filter(b=>b.fecha<=UI.dia && finDe(b)>=UI.dia);
-      h+='<h2>'+esc(DIAS[parse(UI.dia).getDay()]+" "+fmtDate(UI.dia))+'</h2>'+(dd.length?'<div class="stack">'+dd.map(b=>boloRow(b)).join("")+'</div>':'<div class="empty">Día libre.</div>')+
-        '<div class="actions" style="margin-top:10px"><button class="btn" type="button" data-nuevo-dia="'+UI.dia+'">Añadir bolo este día</button></div>';
+      const dd = bolosArr().filter(b=>b.fecha<=UI.dia && finDe(b)>=UI.dia);
+      h+=`<h2>${esc(DIAS[parse(UI.dia).getDay()]+" "+fmtDate(UI.dia))}</h2>${dd.length?`<div class="stack">${dd.map(b=>boloRow(b)).join("")}</div>`:'<div class="empty">Día libre.</div>'}
+        <div class="actions" style="margin-top:10px"><button class="btn" type="button" data-nuevo-dia="${UI.dia}">Añadir bolo este día</button></div>`;
     } else h+='<p class="hint">Toca un día para ver sus bolos o apuntar uno nuevo.</p>';
     return h;
   }
-  h+='<div class="filters" role="group" aria-label="Filtrar">'+filtros.map(([k,l])=>'<button type="button" data-filtro="'+k+'" aria-pressed="'+(UI.filtro===k)+'">'+l+'</button>').join("")+'</div>';
-  if(UI.filtro==="sincobrar") bs=bs.filter(b=>pendienteDe(b)>0);
-  else if(UI.filtro!=="todos") bs=bs.filter(b=>b.estado===UI.filtro);
-  if(!bs.length) return h+'<div class="empty"><strong>No hay bolos aquí</strong>Cambia de periodo o filtro, o pulsa «Nuevo bolo».</div>';
-  const tot = bs.filter(activo).reduce((s,b)=>s+importe(b),0);
-  h+='<p class="small muted" style="margin:0 0 10px">'+bs.length+' bolo'+(bs.length===1?"":"s")+' · confirmados y realizados suman <span class="num">'+eur(tot)+'</span></p>';
+  const filtros=[["todos","Todos"],["confirmado","Confirmados"],["reserva","En reserva"],["posible","Posibles"],["realizado","Realizados"],["sincobrar","Sin cobrar"],["cancelado","Cancelados"]];
+  h+=`<div class="filters" role="group" aria-label="Filtrar">${filtros.map(([k,l])=>`<button type="button" data-filtro="${k}" aria-pressed="${UI.filtro===k}">${l}</button>`).join("")}</div>`;
+  if(UI.filtro==="sincobrar") bs=bs.filter(b=>deudaDe(b)>0);
+  else if(UI.filtro!=="todos") bs=bs.filter(b=>estadoEf(b)===UI.filtro);
+  if(!bs.length) return h+'<div class="empty"><strong>No hay bolos aquí</strong>Cambia de mes o de filtro, o pulsa «Nuevo bolo».</div>';
+  h+=`<p class="small muted" style="margin:0 4px 10px">${plural(bs.length,"bolo","bolos")} · confirmados y realizados suman <span class="num">${eur(suma(bs.filter(activo),importe))}</span></p>`;
   if(UI.mode==="anio"){
     const groups=new Map(); bs.forEach(b=>{ const k=b.fecha.slice(0,7); if(!groups.has(k)) groups.set(k,[]); groups.get(k).push(b); });
-    groups.forEach((arr,k)=>{ h+='<h2>'+MESES[Number(k.slice(5))-1]+'</h2><div class="stack">'+arr.map(b=>boloRow(b)).join("")+'</div>'; });
-  } else h+='<div class="stack">'+bs.map(b=>boloRow(b)).join("")+'</div>';
+    groups.forEach((arr,k)=>{ h+=`<h2>${cap(MESES[Number(k.slice(5))-1])} · <span class="num">${eur(suma(arr.filter(activo),importe))}</span></h2><div class="stack">${arr.map(b=>boloRow(b)).join("")}</div>`; });
+  } else h+=`<div class="stack">${bs.map(b=>boloRow(b)).join("")}</div>`;
   return h;
 }
-function calendar(bs){
-  const first=new Date(UI.y,UI.m,1); const startDow=(first.getDay()+6)%7; const n=new Date(UI.y,UI.m+1,0).getDate();
+function calendar(){
+  const first=new Date(UI.y,UI.m,1), startDow=(first.getDay()+6)%7, n=new Date(UI.y,UI.m+1,0).getDate(), all=bolosArr();
   let h='<div class="card cal">'+["L","M","X","J","V","S","D"].map(d=>'<div class="hd">'+d+'</div>').join("");
   for(let i=0;i<startDow;i++) h+='<button class="out" type="button" tabindex="-1" aria-hidden="true"></button>';
   for(let d=1; d<=n; d++){
     const ds=UI.y+"-"+pad(UI.m+1)+"-"+pad(d);
-    const on=bolosArr().filter(b=>b.fecha<=ds && finDe(b)>=ds);
-    h+='<button type="button" data-dia="'+ds+'" class="'+(ds===TODAY?"today ":"")+(ds===UI.dia?"sel":"")+'" aria-label="'+d+' de '+MESES[UI.m]+(on.length?", "+on.length+" bolo(s)":"")+'">'+d+
-      '<span class="dots">'+on.slice(0,4).map(b=>'<i class="dot d-'+(ESTADOS[b.estado]||ESTADOS.posible).cls+'"></i>').join("")+'</span></button>';
+    const on=all.filter(b=>b.fecha<=ds && finDe(b)>=ds);
+    h+=`<button type="button" data-dia="${ds}" class="${ds===TODAY?"today ":""}${ds===UI.dia?"sel":""}" aria-label="${d} de ${MESES[UI.m]}${on.length?", "+plural(on.length,"bolo","bolos"):""}">${d}<span class="dots">${on.slice(0,4).map(b=>`<i class="dot d-${ESTADOS[estadoEf(b)].cls}"></i>`).join("")}</span></button>`;
   }
-  h+='</div><div class="legend">'+Object.values(ESTADOS).map(gelTag).join("")+'</div>';
-  return h;
+  return h+'</div><div class="legend">'+Object.values(ESTADOS).map(estadoChip).join("")+'</div>';
 }
 
 function vGastos(){
   const gs = gastosArr().filter(g=>inPeriod(g.fecha)).sort((a,b)=>b.fecha.localeCompare(a.fecha));
-  if(!gs.length) return '<div class="empty"><strong>Sin gastos en '+esc(periodLabel())+'</strong>Apunta gasolina, peajes, dietas, material o la cuota de autónomos con «Nuevo gasto». Puedes asociarlos a un bolo para saber cuánto te deja cada uno.</div>';
-  const tot=gs.reduce((s,g)=>s+num(g.importe),0);
+  if(!gs.length) return `<div class="empty"><strong>Sin gastos en ${esc(periodoTexto())}</strong>Apunta gasolina, peajes, dietas, material o la cuota de autónomos con «Nuevo gasto». Si lo asocias a un bolo, sabrás cuánto te deja cada uno.</div>`;
+  const tot=suma(gs,g=>num(g.importe));
   const porCat=new Map(); gs.forEach(g=>porCat.set(g.categoria||"otros",(porCat.get(g.categoria||"otros")||0)+num(g.importe)));
-  let h='<div class="card hero"><div class="hero-main"><div><div class="cap">Gastos de '+esc(periodLabel())+'</div><div class="big num">'+eur(tot)+'</div></div><div class="small muted">'+gs.length+' apunte'+(gs.length===1?"":"s")+'</div></div>'+
-    '<div class="cats">'+[...porCat.entries()].sort((a,b)=>b[1]-a[1]).map(([k,v])=>'<div><div style="display:flex;justify-content:space-between;gap:10px;font-size:14px"><span>'+esc(CATS[k]||k)+'</span><span class="num">'+eur(v)+'</span></div><div class="bar"><i style="width:'+Math.round(v/tot*100)+'%"></i></div></div>').join("")+'</div></div>';
-  h+='<h2>Apuntes</h2><div class="stack">'+gs.map(g=>{
-    const b=g.boloId?S.bolos.get(g.boloId):null; const d=parse(g.fecha);
+  let h=`<div class="card hero"><div class="hero-main"><div><div class="cap">Gastos de ${esc(periodoTexto())}</div><div class="big">${eur(tot)}</div></div><div class="small muted">${plural(gs.length,"apunte","apuntes")}</div></div>
+    <div class="cats">${[...porCat.entries()].sort((a,b)=>b[1]-a[1]).map(([k,v])=>`<div><div style="display:flex;justify-content:space-between;gap:10px;font-size:14px"><span>${esc(CATS[k]||k)}</span><span class="num">${eur(v)}</span></div><div class="bar"><i style="width:${tot?Math.round(v/tot*100):0}%"></i></div></div>`).join("")}</div></div>`;
+  h+=`<h2>Apuntes</h2><div class="stack">${gs.map(g=>{
+    const b=g.boloId?S.bolos.get(g.boloId):null, d=parse(g.fecha);
     const sub=[CATS[g.categoria]||"Otros", b?(b.evento||b.empresa):"", g.lugar].filter(Boolean).join(" · ");
-    return '<button class="row" type="button" data-gasto="'+g.id+'"><div class="datebox"><div class="d">'+d.getDate()+'</div><div class="w">'+(UI.mode==="anio"?MESES[d.getMonth()].slice(0,3):DIAS[d.getDay()])+'</div></div>'+
-      '<div class="row-body"><div class="row-title">'+esc(g.concepto||CATS[g.categoria]||"Gasto")+'</div><div class="row-sub">'+esc(sub)+'</div></div>'+
-      '<div class="row-amt"><div class="a num">'+eur(num(g.importe))+'</div>'+(g.categoria==="km"&&g.km?'<div class="b num">'+esc(g.km)+' km</div>':"")+'</div></button>';
-  }).join("")+'</div>';
+    return `<button class="row" type="button" data-gasto="${g.id}"><div class="datebox"><div class="d">${d.getDate()}</div><div class="w">${UI.mode==="anio"?MESES[d.getMonth()].slice(0,3):DIAS[d.getDay()]}</div></div>
+      <div class="row-body"><div class="row-title">${esc(g.concepto||CATS[g.categoria]||"Gasto")}</div><div class="row-sub">${esc(sub)}</div></div>
+      <div class="row-amt"><div class="a num">${eur(num(g.importe))}</div>${g.categoria==="km"&&g.km?`<div class="b num">${esc(g.km)} km</div>`:""}</div></button>`;
+  }).join("")}</div>`;
   return h;
 }
 
@@ -571,20 +808,17 @@ function vEmpresas(){
   if(!names.length) return '<div class="empty"><strong>Aún no hay empresas</strong>Aparecen solas cuando apuntas un bolo con su empresa. Aquí verás cuánto te ha pagado cada una, lo que te debe y sus datos de contacto.</div>';
   const all=bolosArr();
   const rows=names.map(n=>{
-    const k=slug(n); const bs=all.filter(b=>slug(b.empresa)===k);
-    const act=bs.filter(activo);
-    return {n,k,info:S.empresas.get(k)||{},count:act.length,per:act.filter(b=>inPeriod(b.fecha)).reduce((s,b)=>s+importe(b),0),
-      total:act.reduce((s,b)=>s+importe(b),0),pend:bs.reduce((s,b)=>s+pendienteDe(b),0),late:bs.some(atrasado),
-      last:act.map(b=>b.fecha).sort().pop()};
-  }).sort((a,b)=>b.per-a.per||b.total-a.total);
-  return '<p class="small muted" style="margin:0 0 10px">Ordenadas por lo facturado en '+esc(periodLabel())+'. Toca una para guardar contacto y plazo de pago.</p><div class="stack">'+rows.map(r=>
-    '<button class="row" type="button" data-empresa="'+esc(r.k)+'" data-nombre="'+esc(r.n)+'" style="align-items:flex-start"><div class="row-body">'+
-      '<div class="row-title">'+esc(r.n)+'</div>'+
-      '<div class="row-sub">'+r.count+' bolo'+(r.count===1?"":"s")+' en total · último '+(r.last?esc(fmtDate(r.last)+" "+r.last.slice(0,4)):"—")+'</div>'+
-      (r.info.contacto||r.info.telefono?'<div class="row-sub">'+esc([r.info.contacto,r.info.telefono].filter(Boolean).join(" · "))+'</div>':"")+
-      '<div class="chips">'+(r.pend>0?'<span class="chip '+(r.late?"c-bad":"c-warn")+'">Te debe '+eur(r.pend)+'</span>':'<span class="chip c-ok">Al día</span>')+
-      '<span class="chip c-plain">Paga a '+plazoDe(r.n)+' días</span></div></div>'+
-      '<div class="row-amt"><div class="a num">'+eur(r.per)+'</div><div class="b">histórico <span class="num">'+eur(r.total)+'</span></div></div></button>').join("")+'</div>';
+    const k=slug(n), bs=all.filter(b=>b.empresa&&slug(b.empresa)===k), act=bs.filter(activo);
+    return {n,k,info:S.empresas.get(k)||{},count:act.length,per:suma(act.filter(b=>inPeriod(b.fecha)),importe),
+      total:suma(act,importe),debe:suma(bs,deudaDe),late:bs.some(atrasado),last:act.map(b=>b.fecha).sort().pop()};
+  }).sort((a,b)=>b.debe-a.debe||b.per-a.per||b.total-a.total);
+  return `<p class="small muted" style="margin:0 4px 10px">Primero las que te deben dinero. La cifra grande es lo ganado con cada una en ${esc(periodoTexto())}.</p><div class="stack">${rows.map(r=>
+    `<button class="row" type="button" data-empresa="${esc(r.k)}" data-nombre="${esc(r.n)}" style="align-items:flex-start"><div class="row-body">
+      <div class="row-title">${esc(r.n)}</div>
+      <div class="row-sub">${plural(r.count,"bolo","bolos")} en total · último ${r.last?esc(fmtDate(r.last)+" "+r.last.slice(0,4)):"—"}</div>
+      ${r.info.contacto||r.info.telefono?`<div class="row-sub">${esc([r.info.contacto,r.info.telefono].filter(Boolean).join(" · "))}</div>`:""}
+      <div class="chips">${r.debe>0?`<span class="chip ${r.late?"c-bad":"c-warn"}">Te debe ${eur(r.debe)}</span>`:'<span class="chip c-ok">Al día</span>'}<span class="chip c-plain">Paga a ${plazoDe(r.n)} días</span></div></div>
+      <div class="row-amt"><div class="a num">${eur(r.per)}</div><div class="b">en total <span class="num">${eur(r.total)}</span></div></div></button>`).join("")}</div>`;
 }
 
 /* ---------- sheets ---------- */
@@ -597,8 +831,8 @@ function closeSheet(){ $("#sheet").hidden=true; $("#backdrop").hidden=true; docu
 $("#backdrop").addEventListener("click",closeSheet);
 document.addEventListener("keydown",e=>{ if(e.key==="Escape" && !$("#sheet").hidden) closeSheet(); });
 
-const opt = (v,l,sel) => '<option value="'+esc(v)+'"'+(String(v)===String(sel)?" selected":"")+'>'+esc(l)+'</option>';
-const datalist = (id,arr) => '<datalist id="'+id+'">'+arr.map(x=>'<option value="'+esc(x)+'"></option>').join("")+'</datalist>';
+const opt = (v,l,sel) => `<option value="${esc(v)}"${String(v)===String(sel)?" selected":""}>${esc(l)}</option>`;
+const datalist = (id,arr) => `<datalist id="${id}">${arr.map(x=>`<option value="${esc(x)}"></option>`).join("")}</datalist>`;
 function armDelete(btn,fn){
   btn.addEventListener("click",()=>{
     if(btn.classList.contains("armed")){ fn(); return; }
@@ -608,69 +842,98 @@ function armDelete(btn,fn){
 }
 
 function boloForm(id,preset){
-  const b = id ? {...S.bolos.get(id)} : {fecha:TODAY,estado:"confirmado",pago:"pendiente",tipoPrecio:"total",jornadas:1,...(preset||{})};
-  const radios = Object.entries(ESTADOS).map(([k,e])=>'<label><input type="radio" name="estado" value="'+k+'"'+(b.estado===k?" checked":"")+'><span><i class="sw d-'+e.cls+'"></i>'+e.label+'</span></label>').join("");
-  const gs = id ? gastosDe(id) : [];
-  const gtot = gs.reduce((s,g)=>s+num(g.importe),0);
-  const html='<h3>'+(id?"Editar bolo":"Nuevo bolo")+'</h3><form id="f-bolo" autocomplete="off">'+
-    '<div class="field"><label for="b-evento">Evento o nombre</label><input id="b-evento" name="evento" value="'+esc(b.evento)+'" placeholder="Concierto, feria, gala…"></div>'+
-    '<div class="field"><label for="b-empresa">Empresa que te contrata</label><input id="b-empresa" name="empresa" list="dl-emp" value="'+esc(b.empresa)+'" placeholder="Nombre de la empresa"></div>'+datalist("dl-emp",empresasNombres())+
-    '<div class="two"><div class="field"><label for="b-fecha">Fecha</label><input id="b-fecha" type="date" name="fecha" required value="'+esc(b.fecha)+'"></div>'+
-    '<div class="field"><label for="b-fin">Hasta (si dura más días)</label><input id="b-fin" type="date" name="fechaFin" value="'+esc(b.fechaFin)+'"></div></div>'+
-    '<div class="two"><div class="field"><label for="b-hora">Hora de citación</label><input id="b-hora" type="time" name="hora" value="'+esc(b.hora)+'"></div>'+
-    '<div class="field"><label for="b-jornadas">Jornadas</label><input id="b-jornadas" type="number" inputmode="decimal" step="0.5" min="0" name="jornadas" value="'+esc(b.jornadas)+'"></div></div>'+
-    '<div class="field"><label for="b-lugar">Lugar</label><input id="b-lugar" name="lugar" list="dl-lug" value="'+esc(b.lugar)+'" placeholder="Sala, teatro, recinto, ciudad"></div>'+datalist("dl-lug",lugares())+
-    '<div class="field"><label for="b-puesto">Tu puesto</label><input id="b-puesto" name="puesto" list="dl-puesto" value="'+esc(b.puesto)+'" placeholder="Técnico de iluminación"></div>'+datalist("dl-puesto",PUESTOS)+
-    '<div class="two"><div class="field"><label for="b-precio">Precio pactado (€, sin IVA)</label><input id="b-precio" type="number" inputmode="decimal" step="0.01" min="0" name="precio" value="'+esc(b.precio)+'"></div>'+
-    '<div class="field"><label for="b-tipo">Ese precio es</label><select id="b-tipo" name="tipoPrecio">'+opt("total","Total del bolo",b.tipoPrecio)+opt("jornada","Por jornada",b.tipoPrecio)+'</select></div></div>'+
-    '<div class="calc" id="b-calc"></div>'+
-    '<div class="field"><span class="lbl">Estado</span><div class="radios" id="b-estado">'+radios+'</div></div>'+
-    '<div class="two"><div class="field"><label for="b-pago">Cobro</label><select id="b-pago" name="pago">'+Object.entries(PAGOS).map(([k,l])=>opt(k,l,b.pago)).join("")+'</select></div>'+
-    '<div class="field"><label for="b-fcobro">Fecha de cobro</label><input id="b-fcobro" type="date" name="fechaCobro" value="'+esc(b.fechaCobro)+'"></div></div>'+
-    '<div class="field" id="b-cobrado-wrap"><label for="b-cobrado">Cuánto te han pagado ya (€)</label><input id="b-cobrado" type="number" inputmode="decimal" step="0.01" min="0" name="cobrado" value="'+esc(b.cobrado)+'"></div>'+
-    '<div class="field"><label for="b-factura">Nº de factura</label><input id="b-factura" name="factura" value="'+esc(b.factura)+'" placeholder="Opcional"></div>'+
-    '<div class="field"><label for="b-notas">Notas</label><textarea id="b-notas" name="notas" placeholder="Contacto en el bolo, material, horarios…">'+esc(b.notas)+'</textarea></div>'+
-    (id?'<div class="field"><span class="lbl">Gastos de este bolo · <span class="num">'+eur(gtot)+'</span> · te deja <span class="num">'+eur(importe(b)-gtot)+'</span></span>'+
-      (gs.length?'<div class="stack">'+gs.map(g=>'<button class="row" type="button" data-gasto="'+g.id+'" style="padding:10px"><div class="row-body"><div class="row-title">'+esc(g.concepto||CATS[g.categoria]||"Gasto")+'</div><div class="row-sub">'+esc(fmtDate(g.fecha)+" · "+(CATS[g.categoria]||""))+'</div></div><div class="row-amt"><div class="a num">'+eur(num(g.importe))+'</div></div></button>').join("")+'</div>':"")+
-      '<button class="btn" type="button" id="b-addgasto">Añadir gasto a este bolo</button></div>':"")+
-    '<div class="actions"><button class="btn primary" type="submit">Guardar</button><button class="btn" type="button" id="b-cancel">Cancelar</button></div>'+
-    (id?'<div class="actions"><button class="btn" type="button" id="b-dup">Duplicar</button><button class="btn danger" type="button" id="b-del">Borrar</button></div>':"")+
-  '</form>';
+  const nuevo=!id;
+  const b = id ? {...S.bolos.get(id),id} : {fecha:TODAY,estado:"confirmado",pago:"pendiente",tipoPrecio:"total",jornadas:1,...(preset||{})};
+  const mc=modoCobro(b);
+  const cobroAbierto = !nuevo && (hecho(b) || (b.pago&&b.pago!=="pendiente") || facturada(b));
+  const masAbierto = !!(b.puesto||num(b.extras)||b.notas);
+  const gs = id ? gastosDe(id) : [], gtot=suma(gs,g=>num(g.importe));
+  const qb = id ? quickButtons(b) : [];
+  const radios = Object.entries(ESTADOS).map(([k,e])=>`<label><input type="radio" name="estado" value="${k}"${b.estado===k?" checked":""}><span><i class="sw d-${e.cls}"></i>${e.label}</span></label>`).join("");
+  const html=`<h3>${nuevo?"Nuevo bolo":"Editar bolo"}</h3>
+  ${qb.length?`<div class="quickbar">${qb.map(([a,l,c])=>qbtn(id,a,l,c,true)).join("")}</div>`:""}
+  <form id="f-bolo" autocomplete="off">
+    <div class="field"><label for="b-evento">Evento o nombre</label><input id="b-evento" name="evento" value="${esc(b.evento)}" placeholder="Concierto, feria, gala…"></div>
+    <div class="field"><label for="b-empresa">Empresa que te contrata</label><input id="b-empresa" name="empresa" list="dl-emp" value="${esc(b.empresa)}" placeholder="Nombre de la empresa"><span class="hint" id="b-emp-hint" hidden></span></div>${datalist("dl-emp",empresasNombres())}
+    <div class="two"><div class="field"><label for="b-fecha">Fecha</label><input id="b-fecha" type="date" name="fecha" required value="${esc(b.fecha)}"></div>
+      <div class="field"><label for="b-fin">Hasta (si son varios días)</label><input id="b-fin" type="date" name="fechaFin" value="${esc(b.fechaFin)}"></div></div>
+    <div class="field"><label for="b-lugar">Lugar</label><input id="b-lugar" name="lugar" list="dl-lug" value="${esc(b.lugar)}" placeholder="Sala, teatro, recinto, ciudad"></div>${datalist("dl-lug",lugares())}
+    <div class="two"><div class="field"><label for="b-hora">Hora de citación</label><input id="b-hora" type="time" name="hora" value="${esc(b.hora)}"></div>
+      <div class="field"><label for="b-jornadas">Jornadas</label><input id="b-jornadas" type="number" inputmode="decimal" step="0.5" min="0" name="jornadas" value="${esc(b.jornadas)}"></div></div>
+    <div class="two"><div class="field"><label for="b-precio">Precio pactado (€)</label><input id="b-precio" type="number" inputmode="decimal" step="0.01" min="0" name="precio" value="${esc(b.precio)}"></div>
+      <div class="field"><label for="b-tipo">Ese precio es</label><select id="b-tipo" name="tipoPrecio">${opt("total","Por todo el bolo",b.tipoPrecio)}${opt("jornada","Por jornada",b.tipoPrecio)}</select></div></div>
+    <div class="calc" id="b-calc"></div>
+    <div class="field"><span class="lbl">Estado</span><div class="radios" id="b-estado">${radios}</div></div>
+    <details class="more"${cobroAbierto?" open":""}><summary>Cobro y factura</summary><div class="fields">
+      <div class="field"><label for="b-cobro">Cómo lo cobras</label><select id="b-cobro" name="cobro">${Object.entries(COBROS).map(([k,l])=>opt(k,l,mc)).join("")}</select></div>
+      <div class="two"><div class="field"><label for="b-pago">¿Te lo han pagado?</label><select id="b-pago" name="pago">${Object.entries(PAGOS).map(([k,l])=>opt(k,l,b.pago||"pendiente")).join("")}</select></div>
+        <div class="field"><label for="b-fcobro">Fecha de cobro</label><input id="b-fcobro" type="date" name="fechaCobro" value="${esc(b.fechaCobro)}"></div></div>
+      <div class="field" id="b-cobrado-wrap"><label for="b-cobrado">Cuánto te han pagado ya (€)</label><input id="b-cobrado" type="number" inputmode="decimal" step="0.01" min="0" name="cobrado" value="${esc(b.cobrado)}"></div>
+      <label class="switch" id="b-fact-wrap"><span>Factura enviada</span><input type="checkbox" name="facturada"${facturada(b)?" checked":""}></label>
+      <div class="field" id="b-factura-wrap"><label for="b-factura">Nº de factura</label><input id="b-factura" name="factura" value="${esc(b.factura)}" placeholder="Opcional"></div>
+    </div></details>
+    <details class="more"${masAbierto?" open":""}><summary>Puesto, extras y notas</summary><div class="fields">
+      <div class="field"><label for="b-puesto">Tu puesto</label><input id="b-puesto" name="puesto" list="dl-puesto" value="${esc(b.puesto)}" placeholder="Técnico de iluminación"></div>${datalist("dl-puesto",PUESTOS)}
+      <div class="two"><div class="field"><label for="b-extras">Extras (€)</label><input id="b-extras" type="number" inputmode="decimal" step="0.01" min="0" name="extras" value="${esc(b.extras||"")}"></div>
+        <div class="field"><label for="b-extrasnota">De qué son</label><input id="b-extrasnota" name="extrasNota" value="${esc(b.extrasNota)}" placeholder="Horas extra, dietas…"></div></div>
+      <span class="hint">Los extras se suman al precio pactado: horas extra, dietas o kilometraje que te paga la empresa.</span>
+      <div class="field"><label for="b-notas">Notas</label><textarea id="b-notas" name="notas" placeholder="Contacto en el bolo, material, horarios…">${esc(b.notas)}</textarea></div>
+    </div></details>
+    ${id?`<div class="field"><span class="lbl">Gastos de este bolo · <span class="num">${eur(gtot)}</span> · te deja <span class="num">${eur(importe(b)-gtot)}</span></span>
+      ${gs.length?`<div class="stack" style="border:1px solid var(--line)">${gs.map(g=>`<button class="row" type="button" data-gasto="${g.id}" style="padding:10px 12px"><div class="row-body"><div class="row-title">${esc(g.concepto||CATS[g.categoria]||"Gasto")}</div><div class="row-sub">${esc(fmtDate(g.fecha)+" · "+(CATS[g.categoria]||""))}</div></div><div class="row-amt"><div class="a num">${eur(num(g.importe))}</div></div></button>`).join("")}</div>`:""}
+      <button class="btn" type="button" id="b-addgasto">Añadir gasto a este bolo</button></div>`:""}
+    <div class="actions"><button class="btn primary" type="submit">Guardar</button><button class="btn" type="button" id="b-cancel">Cancelar</button></div>
+    ${id?`<div class="actions"><button class="btn" type="button" id="b-dup">Duplicar</button><button class="btn danger" type="button" id="b-del">Borrar</button></div>`:""}
+  </form>`;
   openSheet(html,root=>{
     const f=root.querySelector("#f-bolo");
     const paintRadios=()=>root.querySelectorAll(".radios input").forEach(i=>i.nextElementSibling.classList.toggle("on",i.checked));
     const calc=()=>{
-      const tmp={precio:f.precio.value,tipoPrecio:f.tipoPrecio.value,jornadas:f.jornadas.value};
-      const A=S.ajustes, base=importe(tmp);
-      f.querySelector("#b-calc").innerHTML = '<span class="muted">Total del bolo</span><span class="num"><strong>'+eur(base)+'</strong>'+(A.autonomo&&base?' · factura <span>'+eur(base*(1+num(A.iva)/100-num(A.irpf)/100))+'</span>':"")+'</span>';
+      const A=S.ajustes, fac=f.cobro.value==="factura";
+      const tot=importe({precio:f.precio.value,tipoPrecio:f.tipoPrecio.value,jornadas:f.jornadas.value,extras:f.extras.value});
+      root.querySelector("#b-calc").innerHTML=`<span class="muted">Total del bolo</span><span class="num"><strong>${eur(tot)}</strong>${fac&&tot?" · en factura "+eur(tot*(1+num(A.iva)/100-num(A.irpf)/100)):""}</span>`;
       root.querySelector("#b-cobrado-wrap").hidden = f.pago.value!=="parcial";
+      root.querySelector("#b-fact-wrap").hidden = !fac;
+      root.querySelector("#b-factura-wrap").hidden = !fac;
     };
-    const syncDays=()=>{ if(f.fechaFin.value && f.fecha.value && f.fechaFin.value>=f.fecha.value && (!id || !b.jornadas || num(b.jornadas)<=1)){ f.jornadas.value=daysBetween(f.fecha.value,f.fechaFin.value)+1; calc(); } };
+    const syncDays=()=>{ if(f.fechaFin.value && f.fecha.value && f.fechaFin.value>=f.fecha.value && (nuevo || num(b.jornadas)<=1)){ f.jornadas.value=daysBetween(f.fecha.value,f.fechaFin.value)+1; calc(); } };
     paintRadios(); calc();
     root.querySelector("#b-estado").addEventListener("change",paintRadios);
-    ["precio","tipoPrecio","jornadas","pago"].forEach(n=>f[n].addEventListener("input",calc));
+    ["precio","tipoPrecio","jornadas","extras","pago","cobro"].forEach(n=>f[n].addEventListener("input",calc));
     f.pago.addEventListener("change",()=>{ if(f.pago.value==="pagado" && !f.fechaCobro.value) f.fechaCobro.value=TODAY; calc(); });
     f.fechaFin.addEventListener("change",syncDays);
+    /* a new gig for a known company starts from what was agreed last time */
+    if(nuevo) f.empresa.addEventListener("change",()=>{
+      const u=ultimoDe(f.empresa.value), hint=root.querySelector("#b-emp-hint");
+      if(!u){ hint.hidden=true; return; }
+      const usados=[];
+      if(!f.precio.value){ f.precio.value=num(u.precio); f.tipoPrecio.value=u.tipoPrecio==="jornada"?"jornada":"total"; usados.push(eur(num(u.precio))+(u.tipoPrecio==="jornada"?" por jornada":" por bolo")); }
+      if(!f.puesto.value && u.puesto){ f.puesto.value=u.puesto; usados.push(u.puesto); }
+      f.cobro.value=modoCobro(u);
+      if(usados.length){ hint.textContent="Como la última vez con "+u.empresa+": "+usados.join(", ")+". Cámbialo si esta vez es distinto."; hint.hidden=false; }
+      calc();
+    });
     root.querySelector("#b-cancel").addEventListener("click",closeSheet);
     f.addEventListener("submit",async e=>{
       e.preventDefault();
       const fd=new FormData(f); const o={};
-      ["evento","empresa","fecha","fechaFin","hora","lugar","puesto","tipoPrecio","pago","fechaCobro","factura","notas","estado"].forEach(k=>o[k]=String(fd.get(k)||"").trim());
-      o.precio=num(fd.get("precio")); o.jornadas=num(fd.get("jornadas"))||1; o.cobrado=num(fd.get("cobrado"));
+      ["evento","empresa","fecha","fechaFin","hora","lugar","puesto","tipoPrecio","pago","fechaCobro","factura","notas","estado","cobro","extrasNota"].forEach(k=>o[k]=String(fd.get(k)||"").trim());
+      o.precio=num(fd.get("precio")); o.jornadas=num(fd.get("jornadas"))||1; o.cobrado=num(fd.get("cobrado")); o.extras=num(fd.get("extras"));
+      o.facturada = o.cobro==="factura" && (!!fd.get("facturada") || !!o.factura);
       if(!o.fecha){ toast("Pon la fecha del bolo"); return; }
       if(!o.evento && !o.empresa){ toast("Pon al menos el evento o la empresa"); f.evento.focus(); return; }
+      if(!ESTADOS[o.estado]) o.estado="confirmado";
       if(o.fechaFin && o.fechaFin<o.fecha) o.fechaFin="";
       if(o.pago!=="parcial") o.cobrado = o.pago==="pagado" ? importe(o) : 0;
       if(o.estado==="confirmado" && finDe(o)<TODAY && o.pago==="pagado") o.estado="realizado";
-      o.actualizado=new Date().toISOString(); if(!id) o.creado=o.actualizado; else o.creado=b.creado||o.actualizado;
+      o.actualizado=new Date().toISOString(); o.creado = id ? (b.creado||o.actualizado) : o.actualizado;
       if(id && b.gcalId) o.gcalId=b.gcalId;
       const bid=id||newId();
-      const ok=await Store.put("bolos",bid,o);
-      if(ok){ closeSheet(); toast(id?"Bolo guardado":"Bolo apuntado"); GCal.after(bid,o); }
+      if(await Store.put("bolos",bid,o)){ closeSheet(); toast(id?"Bolo guardado":"Bolo apuntado"); GCal.after(bid,o); }
     });
     if(id){
       root.querySelector("#b-addgasto").addEventListener("click",()=>gastoForm(null,{boloId:id,fecha:b.fecha,lugar:b.lugar}));
-      root.querySelector("#b-dup").addEventListener("click",()=>{ const c={...b}; delete c.factura; c.pago="pendiente"; c.cobrado=0; c.fechaCobro=""; c.estado="confirmado"; delete c.gcalId; boloForm(null,c); toast("Copia lista: cambia la fecha y guarda"); });
+      root.querySelector("#b-dup").addEventListener("click",()=>{ const c={...b}; ["id","factura","facturada","gcalId","fechaCobro","creado","actualizado"].forEach(k=>delete c[k]); c.pago="pendiente"; c.cobrado=0; c.estado="confirmado"; boloForm(null,c); toast("Copia lista: cambia la fecha y guarda"); });
       armDelete(root.querySelector("#b-del"),async()=>{ if(await Store.del("bolos",id)){ closeSheet(); toast("Bolo borrado"); if(b.gcalId) GCal.after(id,{...b,_borrado:true}); } });
     }
   });
@@ -679,18 +942,18 @@ function boloForm(id,preset){
 function gastoForm(id,preset){
   const g = id ? {...S.gastos.get(id)} : {fecha:TODAY,categoria:"transporte",...(preset||{})};
   const bs = bolosArr().filter(b=>b.estado!=="cancelado" || b.id===g.boloId).sort((a,b)=>b.fecha.localeCompare(a.fecha)).slice(0,120);
-  const html='<h3>'+(id?"Editar gasto":"Nuevo gasto")+'</h3><form id="f-gasto" autocomplete="off">'+
-    '<div class="field"><label for="g-concepto">Concepto</label><input id="g-concepto" name="concepto" value="'+esc(g.concepto)+'" placeholder="Gasolina ida y vuelta, comida, guantes…"></div>'+
-    '<div class="two"><div class="field"><label for="g-cat">Tipo</label><select id="g-cat" name="categoria">'+Object.entries(CATS).map(([k,l])=>opt(k,l,g.categoria)).join("")+'</select></div>'+
-    '<div class="field"><label for="g-fecha">Fecha</label><input id="g-fecha" type="date" name="fecha" required value="'+esc(g.fecha)+'"></div></div>'+
-    '<div class="field" id="g-km-wrap"><label for="g-km">Kilómetros</label><input id="g-km" type="number" inputmode="decimal" step="1" min="0" name="km" value="'+esc(g.km)+'"><span class="hint" id="g-km-hint"></span></div>'+
-    '<div class="field"><label for="g-importe">Importe (€)</label><input id="g-importe" type="number" inputmode="decimal" step="0.01" min="0" name="importe" required value="'+esc(g.importe)+'"></div>'+
-    '<div class="field"><label for="g-bolo">¿De qué bolo?</label><select id="g-bolo" name="boloId">'+opt("","Ninguno (gasto general)",g.boloId||"")+bs.map(b=>opt(b.id,fmtDate(b.fecha)+" "+b.fecha.slice(0,4)+" · "+(b.evento||b.empresa||"Bolo"),g.boloId)).join("")+'</select></div>'+
-    '<div class="field"><label for="g-lugar">Lugar</label><input id="g-lugar" name="lugar" list="dl-lug2" value="'+esc(g.lugar)+'" placeholder="Dónde fue el gasto"></div>'+datalist("dl-lug2",lugares())+
-    '<div class="field"><label for="g-notas">Notas</label><textarea id="g-notas" name="notas" placeholder="¿Tienes el tique? ¿Lo paga la empresa?">'+esc(g.notas)+'</textarea></div>'+
-    '<div class="actions"><button class="btn primary" type="submit">Guardar</button><button class="btn" type="button" id="g-cancel">Cancelar</button></div>'+
-    (id?'<div class="actions"><button class="btn danger" type="button" id="g-del">Borrar</button></div>':"")+
-  '</form>';
+  const html=`<h3>${id?"Editar gasto":"Nuevo gasto"}</h3><form id="f-gasto" autocomplete="off">
+    <div class="field"><label for="g-concepto">Concepto</label><input id="g-concepto" name="concepto" value="${esc(g.concepto)}" placeholder="Gasolina ida y vuelta, comida, guantes…"></div>
+    <div class="two"><div class="field"><label for="g-cat">Tipo</label><select id="g-cat" name="categoria">${Object.entries(CATS).map(([k,l])=>opt(k,l,g.categoria)).join("")}</select></div>
+      <div class="field"><label for="g-fecha">Fecha</label><input id="g-fecha" type="date" name="fecha" required value="${esc(g.fecha)}"></div></div>
+    <div class="field" id="g-km-wrap"><label for="g-km">Kilómetros</label><input id="g-km" type="number" inputmode="decimal" step="1" min="0" name="km" value="${esc(g.km||"")}"><span class="hint" id="g-km-hint"></span></div>
+    <div class="field"><label for="g-importe">Importe (€)</label><input id="g-importe" type="number" inputmode="decimal" step="0.01" min="0" name="importe" required value="${esc(g.importe)}"></div>
+    <div class="field"><label for="g-bolo">¿De qué bolo?</label><select id="g-bolo" name="boloId">${opt("","Ninguno (gasto general)",g.boloId||"")}${bs.map(b=>opt(b.id,fmtDate(b.fecha)+" "+b.fecha.slice(0,4)+" · "+(b.evento||b.empresa||"Bolo"),g.boloId)).join("")}</select></div>
+    <div class="field"><label for="g-lugar">Lugar</label><input id="g-lugar" name="lugar" list="dl-lug2" value="${esc(g.lugar)}" placeholder="Dónde fue el gasto"></div>${datalist("dl-lug2",lugares())}
+    <div class="field"><label for="g-notas">Notas</label><textarea id="g-notas" name="notas" placeholder="¿Tienes el tique? ¿Lo paga la empresa?">${esc(g.notas)}</textarea></div>
+    <div class="actions"><button class="btn primary" type="submit">Guardar</button><button class="btn" type="button" id="g-cancel">Cancelar</button></div>
+    ${id?'<div class="actions"><button class="btn danger" type="button" id="g-del">Borrar</button></div>':""}
+  </form>`;
   openSheet(html,root=>{
     const f=root.querySelector("#f-gasto");
     const kmSync=(fromKm)=>{
@@ -712,8 +975,7 @@ function gastoForm(id,preset){
       if(!o.fecha){ toast("Pon la fecha del gasto"); return; }
       if(!o.importe){ toast("Pon el importe"); f.importe.focus(); return; }
       o.actualizado=new Date().toISOString();
-      const ok=await Store.put("gastos",id||newId(),o);
-      if(ok){ closeSheet(); toast(id?"Gasto guardado":"Gasto apuntado"); }
+      if(await Store.put("gastos",id||newId(),o)){ closeSheet(); toast(id?"Gasto guardado":"Gasto apuntado"); }
     });
     if(id) armDelete(root.querySelector("#g-del"),async()=>{ if(await Store.del("gastos",id)){ closeSheet(); toast("Gasto borrado"); } });
   });
@@ -721,14 +983,22 @@ function gastoForm(id,preset){
 
 function empresaForm(k,nombre){
   const e={nombre,...(S.empresas.get(k)||{})};
-  const html='<h3>'+esc(nombre)+'</h3><form id="f-emp" autocomplete="off">'+
-    '<div class="field"><label for="e-contacto">Persona de contacto</label><input id="e-contacto" name="contacto" value="'+esc(e.contacto)+'"></div>'+
-    '<div class="two"><div class="field"><label for="e-tel">Teléfono</label><input id="e-tel" type="tel" name="telefono" value="'+esc(e.telefono)+'"></div>'+
-    '<div class="field"><label for="e-email">Email</label><input id="e-email" type="email" name="email" value="'+esc(e.email)+'"></div></div>'+
-    '<div class="two"><div class="field"><label for="e-cif">CIF</label><input id="e-cif" name="cif" value="'+esc(e.cif)+'"></div>'+
-    '<div class="field"><label for="e-plazo">Suele pagar a (días)</label><input id="e-plazo" type="number" inputmode="numeric" min="0" name="plazo" value="'+esc(e.plazo||"")+'" placeholder="'+esc(S.ajustes.plazo)+'"></div></div>'+
-    '<div class="field"><label for="e-notas">Notas</label><textarea id="e-notas" name="notas" placeholder="Cómo facturar, tarifas habituales, si pagan tarde…">'+esc(e.notas)+'</textarea></div>'+
-    '<div class="actions"><button class="btn primary" type="submit">Guardar</button><button class="btn" type="button" id="e-cancel">Cancelar</button></div></form>';
+  const bs=bolosArr().filter(b=>b.empresa&&slug(b.empresa)===k), deben=bs.filter(b=>deudaDe(b)>0).sort((a,b)=>a.fecha.localeCompare(b.fecha)), u=ultimoDe(nombre);
+  const html=`<h3>${esc(nombre)}</h3>
+    <div class="ledger" style="border:0;padding:0 0 16px">
+      <div><span>Te debe</span><span class="num">${eur(suma(deben,deudaDe))}</span></div>
+      <div><span>Ganado con ella en total</span><span class="num">${eur(suma(bs.filter(activo),importe))}</span></div>
+      ${u?`<div><span>Última tarifa</span><span class="num">${eur(num(u.precio))}${u.tipoPrecio==="jornada"?" / jornada":" / bolo"}</span></div>`:""}
+    </div>
+    ${deben.length?`<div class="stack" style="border:1px solid var(--line);margin-bottom:18px">${deben.map(b=>boloRow(b,{quickPay:true,showMonth:true,showPend:true,deuda:true})).join("")}</div>`:""}
+    <form id="f-emp" autocomplete="off">
+    <div class="field"><label for="e-contacto">Persona de contacto</label><input id="e-contacto" name="contacto" value="${esc(e.contacto)}"></div>
+    <div class="two"><div class="field"><label for="e-tel">Teléfono</label><input id="e-tel" type="tel" name="telefono" value="${esc(e.telefono)}"></div>
+      <div class="field"><label for="e-email">Email</label><input id="e-email" type="email" name="email" value="${esc(e.email)}"></div></div>
+    <div class="two"><div class="field"><label for="e-cif">CIF</label><input id="e-cif" name="cif" value="${esc(e.cif)}"></div>
+      <div class="field"><label for="e-plazo">Suele pagar a (días)</label><input id="e-plazo" type="number" inputmode="numeric" min="0" name="plazo" value="${esc(e.plazo||"")}" placeholder="${esc(S.ajustes.plazo)}"></div></div>
+    <div class="field"><label for="e-notas">Notas</label><textarea id="e-notas" name="notas" placeholder="Cómo facturar, tarifas habituales, si pagan tarde…">${esc(e.notas)}</textarea></div>
+    <div class="actions"><button class="btn primary" type="submit">Guardar</button><button class="btn" type="button" id="e-cancel">Cancelar</button></div></form>`;
   openSheet(html,root=>{
     const f=root.querySelector("#f-emp");
     root.querySelector("#e-cancel").addEventListener("click",closeSheet);
@@ -742,26 +1012,26 @@ function empresaForm(k,nombre){
 
 function ajustesForm(){
   const A=S.ajustes;
-  const html='<h3>Ajustes</h3><form id="f-aj">'+
-    '<label class="switch"><span><strong>Facturo como autónomo</strong><br><span class="hint">Calcula retención de IRPF e IVA a apartar</span></span><input type="checkbox" name="autonomo"'+(A.autonomo?" checked":"")+'></label>'+
-    '<div class="two"><div class="field"><label for="a-irpf">Retención IRPF (%)</label><input id="a-irpf" type="number" inputmode="decimal" step="0.5" min="0" name="irpf" value="'+esc(A.irpf)+'"><span class="hint">7 % los primeros años, luego 15 %</span></div>'+
-    '<div class="field"><label for="a-iva">IVA (%)</label><input id="a-iva" type="number" inputmode="decimal" step="1" min="0" name="iva" value="'+esc(A.iva)+'"></div></div>'+
-    '<div class="two"><div class="field"><label for="a-km">Precio por km (€)</label><input id="a-km" type="number" inputmode="decimal" step="0.01" min="0" name="km" value="'+esc(A.km)+'"></div>'+
-    '<div class="field"><label for="a-plazo">Plazo de cobro normal (días)</label><input id="a-plazo" type="number" inputmode="numeric" min="1" name="plazo" value="'+esc(A.plazo)+'"></div></div>'+
-    '<div class="actions"><button class="btn primary" type="submit">Guardar ajustes</button></div></form>'+
-    '<h2>Google Calendar</h2>'+
-    '<div class="card" style="padding:14px;display:flex;flex-direction:column;gap:12px;background:var(--bg)">'+
-      '<p class="small" style="margin:0">Tus bolos se apuntan en un calendario aparte de Google Calendar, sin tocar tus otros calendarios. Los cancelados se quitan solos.</p>'+
-      '<div class="field"><label for="gc-nombre">Nombre del calendario en Google</label><input id="gc-nombre" value="'+esc(A.gcalNombre||"Mis Bolos")+'"></div>'+
-      '<div id="gc-estado" class="small"></div>'+
-      '<div class="actions" style="margin:0"><button class="btn" type="button" id="gc-conectar">'+(A.gcalId?"Volver a buscar":"Buscar calendario y activar")+'</button>'+
-      (A.gcalId?'<button class="btn" type="button" id="gc-todo">Pasar todos los bolos</button>':"")+'</div>'+
-      (A.gcalId?'<label class="switch" style="background:var(--surface)"><span>Sincronizar al guardar</span><input type="checkbox" id="gc-on"'+(A.gcalOn?" checked":"")+'></label>':"")+
-    '</div>'+
-    '<h2>Tus datos</h2><p class="small muted" style="margin-top:0">'+(S.storeKind==="nube"?"Se guardan en tu cuenta de Claude y los ves igual en el móvil y en el ordenador.":"Se guardan solo en este dispositivo. Descarga una copia de vez en cuando.")+'</p>'+
-    '<div class="actions"><button class="btn" type="button" id="x-csv-b">Exportar bolos (CSV)</button><button class="btn" type="button" id="x-csv-g">Exportar gastos (CSV)</button></div>'+
-    '<div class="actions"><button class="btn" type="button" id="x-json">Descargar copia completa</button><button class="btn" type="button" id="x-import">Restaurar copia</button></div>'+
-    '<p class="hint">Los CSV se abren en Excel o Google Sheets, útiles para tu gestoría.</p>';
+  const html=`<h3>Ajustes</h3><form id="f-aj">
+    <label class="switch"><span><strong>Normalmente cobro con factura</strong><br><span class="hint">Desactívalo si lo normal es que te den de alta y cobres por nómina. En cada bolo puedes elegir otra cosa.</span></span><input type="checkbox" name="autonomo"${A.autonomo?" checked":""}></label>
+    <div class="two"><div class="field"><label for="a-irpf">Retención IRPF (%)</label><input id="a-irpf" type="number" inputmode="decimal" step="0.5" min="0" name="irpf" value="${esc(A.irpf)}"><span class="hint">7 % los primeros años, luego 15 %</span></div>
+      <div class="field"><label for="a-iva">IVA (%)</label><input id="a-iva" type="number" inputmode="decimal" step="1" min="0" name="iva" value="${esc(A.iva)}"></div></div>
+    <div class="two"><div class="field"><label for="a-km">Precio por km (€)</label><input id="a-km" type="number" inputmode="decimal" step="0.01" min="0" name="km" value="${esc(A.km)}"></div>
+      <div class="field"><label for="a-plazo">Plazo de cobro normal (días)</label><input id="a-plazo" type="number" inputmode="numeric" min="1" name="plazo" value="${esc(A.plazo)}"></div></div>
+    <div class="actions"><button class="btn primary" type="submit">Guardar ajustes</button></div></form>
+    <h2>Google Calendar</h2>
+    <div class="card" style="padding:14px;display:flex;flex-direction:column;gap:12px;background:var(--bg)">
+      <p class="small" style="margin:0">Tus bolos se apuntan en un calendario aparte de Google Calendar, sin tocar tus otros calendarios. Los cancelados se quitan solos.</p>
+      <div class="field"><label for="gc-nombre">Nombre del calendario en Google</label><input id="gc-nombre" value="${esc(A.gcalNombre||"Mis Bolos")}"></div>
+      <div id="gc-estado" class="small"></div>
+      <div class="actions" style="margin:0"><button class="btn" type="button" id="gc-conectar">${A.gcalId?"Volver a buscar":"Buscar calendario y activar"}</button>
+      ${A.gcalId?'<button class="btn" type="button" id="gc-todo">Pasar todos los bolos</button>':""}</div>
+      ${A.gcalId?`<label class="switch" style="background:var(--surface)"><span>Sincronizar al guardar</span><input type="checkbox" id="gc-on"${A.gcalOn?" checked":""}></label>`:""}
+    </div>
+    <h2>Tus datos</h2><p class="small muted" style="margin-top:0">${S.storeKind==="nube"?"Se guardan en tu cuenta de Claude y los ves igual en el móvil y en el ordenador.":"Se guardan solo en este dispositivo. Descarga una copia de vez en cuando."}</p>
+    <div class="actions"><button class="btn" type="button" id="x-csv-b">Exportar bolos (CSV)</button><button class="btn" type="button" id="x-csv-g">Exportar gastos (CSV)</button></div>
+    <div class="actions"><button class="btn" type="button" id="x-json">Descargar copia completa</button><button class="btn" type="button" id="x-import">Restaurar copia</button></div>
+    <p class="hint">Los CSV se abren en Excel o Google Sheets, útiles para tu gestoría.</p>`;
   openSheet(html,root=>{
     const f=root.querySelector("#f-aj");
     f.addEventListener("submit",async e=>{
@@ -775,25 +1045,25 @@ function ajustesForm(){
         : '<span class="muted">Aún sin activar.</span>'; };
     paintGc();
     root.querySelector("#gc-conectar").addEventListener("click",async ev=>{
-      const btn=ev.currentTarget; const nombre=root.querySelector("#gc-nombre").value.trim()||"Mis Bolos";
+      const btn=ev.currentTarget, nombre=root.querySelector("#gc-nombre").value.trim()||"Mis Bolos";
       btn.disabled=true; gcEstado.textContent="Buscando «"+nombre+"» en tu Google Calendar…";
       try{
         const cid=await GCal.findCalendar(nombre);
         if(!cid){ gcEstado.innerHTML='<span class="chip c-warn">No encontrado</span> No tienes ningún calendario llamado «'+esc(nombre)+'». Créalo en calendar.google.com desde el navegador (versión para ordenador): «Otros calendarios» → «+» → «Crear calendario», ponle ese nombre y vuelve a pulsar este botón.'; btn.disabled=false; return; }
-        await Store.put("ajustes","general",{...S.ajustes,gcalId:cid,gcalNombre:nombre,gcalOn:true});
-        S.ajustes={...S.ajustes,gcalId:cid,gcalNombre:nombre,gcalOn:true};
-        toast("Calendario conectado"); ajustesForm();
+        const na={...S.ajustes,gcalId:cid,gcalNombre:nombre,gcalOn:true};
+        if(await Store.put("ajustes","general",na)){ S.ajustes=na; toast("Calendario conectado"); ajustesForm(); }
+        else btn.disabled=false;
       }catch(e){ gcEstado.innerHTML='<span class="chip c-bad">Error</span> '+esc(GCal.errText(e)); btn.disabled=false; }
     });
     const gcOn=root.querySelector("#gc-on");
-    if(gcOn) gcOn.addEventListener("change",async()=>{ const on=gcOn.checked; S.ajustes={...S.ajustes,gcalOn:on}; await Store.put("ajustes","general",S.ajustes); paintGc(); toast(on?"Sincronización activada":"Sincronización en pausa"); });
+    if(gcOn) gcOn.addEventListener("change",async()=>{ const na={...S.ajustes,gcalOn:gcOn.checked}; if(await Store.put("ajustes","general",na)){ S.ajustes=na; paintGc(); toast(na.gcalOn?"Sincronización activada":"Sincronización en pausa"); } });
     const gcTodo=root.querySelector("#gc-todo");
     if(gcTodo) gcTodo.addEventListener("click",async()=>{
       if(!S.ajustes.gcalOn){ toast("Activa «Sincronizar al guardar» primero"); return; }
       gcTodo.disabled=true;
       const r=await GCal.syncAll((n,t)=>{ gcTodo.textContent="Pasando "+n+" de "+t+"…"; });
       gcTodo.disabled=false; gcTodo.textContent="Pasar todos los bolos";
-      gcEstado.innerHTML = r.fails ? '<span class="chip c-warn">'+r.n+' de '+r.total+'</span> '+esc(GCal.errText(r.lastErr)) : '<span class="chip c-ok"><i class="dot d-ok"></i>Hecho</span> '+r.n+' bolo'+(r.n===1?"":"s")+' al día en «'+esc(S.ajustes.gcalNombre)+'».';
+      gcEstado.innerHTML = r.fails ? '<span class="chip c-warn">'+r.n+' de '+r.total+'</span> '+esc(GCal.errText(r.lastErr)) : '<span class="chip c-ok"><i class="dot d-ok"></i>Hecho</span> '+plural(r.n,"bolo","bolos")+' al día en «'+esc(S.ajustes.gcalNombre)+'».';
     });
     root.querySelector("#x-csv-b").addEventListener("click",()=>exportCSV("bolos"));
     root.querySelector("#x-csv-g").addEventListener("click",()=>exportCSV("gastos"));
@@ -814,9 +1084,9 @@ const dec = n => String(Math.round((n||0)*100)/100).replace(".",",");
 function exportCSV(kind){
   let rows;
   if(kind==="bolos"){
-    rows=[["Fecha","Hasta","Evento","Empresa","Lugar","Puesto","Jornadas","Importe","Estado","Cobro","Cobrado","Pendiente","Fecha cobro","Factura","Gastos asociados","Te deja","Notas"]];
-    bolosArr().sort((a,b)=>a.fecha.localeCompare(b.fecha)).forEach(b=>{ const g=gastosDe(b.id).reduce((s,x)=>s+num(x.importe),0);
-      rows.push([b.fecha,b.fechaFin,b.evento,b.empresa,b.lugar,b.puesto,dec(num(b.jornadas)||1),dec(importe(b)),(ESTADOS[b.estado]||{}).label,PAGOS[b.pago]||"",dec(cobradoDe(b)),dec(pendienteDe(b)),b.fechaCobro,b.factura,dec(g),dec(importe(b)-g),b.notas]); });
+    rows=[["Fecha","Hasta","Evento","Empresa","Lugar","Puesto","Jornadas","Precio pactado","Extras","Total","Estado","Cómo se cobra","Factura enviada","Nº factura","Cobro","Cobrado","Te deben","Fecha cobro","Gastos asociados","Te deja","Notas"]];
+    bolosArr().sort((a,b)=>a.fecha.localeCompare(b.fecha)).forEach(b=>{ const g=suma(gastosDe(b.id),x=>num(x.importe));
+      rows.push([b.fecha,b.fechaFin,b.evento,b.empresa,b.lugar,b.puesto,dec(num(b.jornadas)||1),dec(baseDe(b)),dec(num(b.extras)),dec(importe(b)),ESTADOS[estadoEf(b)].label,COBROS[modoCobro(b)],modoCobro(b)==="factura"?(facturada(b)?"Sí":"No"):"",b.factura,PAGOS[b.pago]||"",dec(cobradoDe(b)),dec(deudaDe(b)),b.fechaCobro,dec(g),dec(importe(b)-g),b.notas]); });
   } else {
     rows=[["Fecha","Concepto","Tipo","Importe","Km","Bolo","Lugar","Notas"]];
     gastosArr().sort((a,b)=>a.fecha.localeCompare(b.fecha)).forEach(g=>{ const b=g.boloId?S.bolos.get(g.boloId):null;
@@ -847,28 +1117,30 @@ $("#mode-anio").addEventListener("click",()=>{ UI.mode="anio"; UI.dia=null; rend
 function shift(d){ if(UI.mode==="anio") UI.y+=d; else { UI.m+=d; if(UI.m<0){UI.m=11;UI.y--;} if(UI.m>11){UI.m=0;UI.y++;} } UI.dia=null; render(); }
 $("#prev").addEventListener("click",()=>shift(-1));
 $("#next").addEventListener("click",()=>shift(1));
+$("#hoy").addEventListener("click",()=>{ UI.y=today.getFullYear(); UI.m=today.getMonth(); UI.dia=null; render(); });
 $("#btn-ajustes").addEventListener("click",ajustesForm);
 $("#fab").addEventListener("click",()=>{
-  if(UI.tab==="gastos"){ gastoForm(null, UI.mode==="mes" && !inPeriod(TODAY) ? {fecha:UI.y+"-"+pad(UI.m+1)+"-01"} : null); }
-  else boloForm(null, UI.dia ? {fecha:UI.dia} : (UI.mode==="mes" && !inPeriod(TODAY) ? {fecha:UI.y+"-"+pad(UI.m+1)+"-01"} : null));
+  const fueraDeHoy = UI.mode==="mes" && !inPeriod(TODAY) ? {fecha:UI.y+"-"+pad(UI.m+1)+"-01"} : null;
+  if(UI.tab==="gastos") gastoForm(null,fueraDeHoy);
+  else boloForm(null, UI.dia ? {fecha:UI.dia} : fueraDeHoy);
 });
-document.addEventListener("click",async e=>{
-  const t=e.target.closest("[data-bolo],[data-gasto],[data-empresa],[data-filtro],[data-bview],[data-dia],[data-nuevo-dia],[data-cobrar]");
+document.addEventListener("input",e=>{
+  if(e.target.id!=="q") return;
+  UI.q=e.target.value; const el=$("#bolos-body"); if(el) el.innerHTML=bolosBody();
+});
+document.addEventListener("click",e=>{
+  const t=e.target.closest("[data-quick],[data-bolo],[data-gasto],[data-empresa],[data-filtro],[data-bview],[data-dia],[data-nuevo-dia],[data-ym]");
   if(!t) return;
-  if(t.dataset.cobrar){
-    const id=t.dataset.cobrar, b=S.bolos.get(id); if(!b) return;
-    const o={...b,pago:"pagado",cobrado:importe(b),fechaCobro:TODAY,actualizado:new Date().toISOString()};
-    if(o.estado==="confirmado") o.estado="realizado";
-    t.disabled=true; if(await Store.put("bolos",id,o)){ toast("Marcado como cobrado"); if(o.estado!==b.estado) GCal.after(id,o); }
-    return;
-  }
-  if(t.dataset.bolo) return boloForm(t.dataset.bolo);
-  if(t.dataset.gasto) return gastoForm(t.dataset.gasto);
-  if(t.dataset.empresa) return empresaForm(t.dataset.empresa,t.dataset.nombre);
-  if(t.dataset.filtro){ UI.filtro=t.dataset.filtro; return render(); }
-  if(t.dataset.bview){ UI.bolosView=t.dataset.bview; return render(); }
-  if(t.dataset.dia){ UI.dia = UI.dia===t.dataset.dia ? null : t.dataset.dia; return render(); }
-  if(t.dataset.nuevoDia) return boloForm(null,{fecha:t.dataset.nuevoDia});
+  const d=t.dataset;
+  if(d.quick){ const [id,accion]=d.quick.split("|"); t.disabled=true; if(d.close || !$("#sheet").hidden) closeSheet(); quick(id,accion); return; }
+  if(d.bolo) return boloForm(d.bolo);
+  if(d.gasto) return gastoForm(d.gasto);
+  if(d.empresa) return empresaForm(d.empresa,d.nombre);
+  if(d.filtro){ UI.filtro=d.filtro; return render(); }
+  if(d.bview){ UI.bolosView=d.bview; return render(); }
+  if(d.dia){ UI.dia = UI.dia===d.dia ? null : d.dia; return render(); }
+  if(d.nuevoDia) return boloForm(null,{fecha:d.nuevoDia});
+  if(d.ym){ UI.mode="mes"; UI.y=Number(d.ym.slice(0,4)); UI.m=Number(d.ym.slice(5,7))-1; UI.dia=null; render(); window.scrollTo(0,0); }
 });
 function fromHash(){ const h=(location.hash||"").slice(1); if(["resumen","bolos","gastos","empresas"].includes(h)) UI.tab=h; }
 window.addEventListener("hashchange",()=>{ fromHash(); render(); });
