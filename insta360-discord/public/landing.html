@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Puente de directo</title>
+  <style>
+    /* Página autónoma: no depende de ningún otro fichero para verse bien. */
+    html, body { height: 100%; margin: 0; }
+    body {
+      display: grid; place-items: center; padding: 24px; box-sizing: border-box;
+      background: #0d0f13; color: #eceff4;
+      font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    }
+    .card {
+      width: min(440px, 100%); padding: 32px 28px; text-align: center; box-sizing: border-box;
+      background: #161920; border: 1px solid #2b303b; border-radius: 14px;
+    }
+    .logo {
+      display: inline-grid; place-items: center; width: 52px; height: 52px;
+      border-radius: 16px; background: #f6c445; color: #1a1503;
+    }
+    .logo svg { width: 28px; height: 28px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    h1 { margin: 14px 0 8px; font-size: 21px; }
+    p { margin: 0; color: #98a1b0; }
+    @media (prefers-color-scheme: light) {
+      body { background: #f3f4f7; color: #171a21; }
+      .card { background: #fff; border-color: #dde1e8; }
+      p { color: #5d6675; }
+    }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <span class="logo">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m22 8-6 4 6 4V8z"/><rect x="2" y="6" width="14" height="12" rx="2"/></svg>
+    </span>
+    <h1>Puente de directo</h1>
+    <p>Este servidor es privado. Para ver el directo necesitas el enlace completo que se comparte en Discord.</p>
+  </main>
+</body>
+</html>

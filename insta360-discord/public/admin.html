@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="es" class="adaptive">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="referrer" content="no-referrer">
+  <title>Panel · Puente de directo</title>
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="assets/app.css">
+</head>
+<body>
+  <!-- Inicio de sesión -->
+  <main class="centered" id="login" hidden>
+    <form class="card login" id="login-form" autocomplete="off">
+      <span class="logo">
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m22 8-6 4 6 4V8z"/><rect x="2" y="6" width="14" height="12" rx="2"/></svg>
+      </span>
+      <h1>Panel de control</h1>
+      <p>Escribe la contraseña que apareció en la consola al arrancar el puente por primera vez.</p>
+      <div class="field">
+        <label for="password">Contraseña</label>
+        <input id="password" type="password" autocomplete="current-password" required autofocus>
+      </div>
+      <button class="btn primary" type="submit">Entrar</button>
+      <p class="note bad" id="login-error" role="alert" hidden></p>
+    </form>
+  </main>
+
+  <!-- Panel -->
+  <div class="admin" id="app" hidden>
+    <header class="top">
+      <span class="logo">
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m22 8-6 4 6 4V8z"/><rect x="2" y="6" width="14" height="12" rx="2"/></svg>
+      </span>
+      <h1>Puente de directo <span class="note" id="version"></span></h1>
+      <button class="btn small ghost" type="button" id="logout">Cerrar sesión</button>
+    </header>
+
+    <div class="alerts" id="alerts"></div>
+
+    <div class="grid">
+      <!-- Estado -->
+      <section class="card panel wide">
+        <div class="status">
+          <div class="preview">
+            <video id="preview" playsinline muted autoplay></video>
+            <div class="empty" id="preview-empty">Sin señal de la cámara</div>
+          </div>
+          <div>
+            <span class="pill" id="state-pill">Sin señal</span>
+            <p class="note" id="state-text"></p>
+            <dl class="facts">
+              <div><dt>Imagen</dt><dd id="fact-video">—</dd></div>
+              <div><dt>Caudal</dt><dd id="fact-bitrate">—</dd></div>
+              <div><dt>Sonido</dt><dd id="fact-audio">—</dd></div>
+              <div><dt>Viendo ahora</dt><dd id="fact-viewers">—</dd></div>
+              <div><dt>Tiempo en directo</dt><dd id="fact-uptime">—</dd></div>
+              <div><dt>Origen</dt><dd id="fact-source">—</dd></div>
+            </dl>
+            <div class="actions">
+              <button class="btn small danger" type="button" id="kick" hidden>Desconectar la cámara</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 1. Cámara -->
+      <section class="card panel">
+        <h2><span class="step">1</span> Cámara</h2>
+        <p class="lead">Dirección que hay que pegar en la app de Insta360 para que la cámara emita hacia este puente.</p>
+        <div class="field">
+          <label for="rtmp-url">Dirección RTMP (incluye la clave)</label>
+          <div class="row">
+            <input id="rtmp-url" type="password" readonly>
+            <button class="btn small" type="button" data-reveal="rtmp-url">Mostrar</button>
+            <button class="btn small" type="button" data-copy="rtmp-url">Copiar</button>
+          </div>
+          <div class="hint" id="rtmp-hint"></div>
+        </div>
+        <p class="note bad" id="rejected" hidden></p>
+        <ol class="steps">
+          <li>Conecta la cámara a la app de Insta360 y elige <b>Directo</b>.</li>
+          <li>Como plataforma selecciona <b>RTMP</b> y pega la dirección de arriba.</li>
+          <li>Elige una red Wi‑Fi de <b>5 GHz</b> con Internet (por ejemplo, el punto de acceso del móvil) y empieza.</li>
+          <li>Ya puedes <b>bloquear el móvil</b>: la cámara emite por sí sola. Para terminar, detén el directo en la cámara.</li>
+        </ol>
+        <div class="actions">
+          <button class="btn small" type="button" id="rotate-key">Generar una clave nueva</button>
+        </div>
+      </section>
+
+      <!-- 2. Ver -->
+      <section class="card panel">
+        <h2><span class="step">2</span> Ver el directo</h2>
+        <p class="lead">Enlace del visor. Cualquiera que lo tenga puede ver el directo, sin cuenta ni contraseña.</p>
+        <div class="field">
+          <label for="viewer-url">Enlace del visor</label>
+          <div class="row">
+            <input id="viewer-url" type="text" readonly>
+            <button class="btn small" type="button" data-copy="viewer-url">Copiar</button>
+            <a class="btn small" id="viewer-open" target="_blank" rel="noopener">Abrir</a>
+          </div>
+          <div class="hint">Los avisos de Discord incluyen este enlace automáticamente.</div>
+        </div>
+        <div class="actions">
+          <button class="btn small" type="button" id="rotate-link">Invalidar y crear otro enlace</button>
+        </div>
+      </section>
+
+      <!-- 3. Internet -->
+      <section class="card panel wide">
+        <h2><span class="step">3</span> Acceso desde Internet</h2>
+        <p class="lead">Fuera de casa, la cámara y tus amigos llegan a este puente por su dirección pública. Indícala aquí para que los enlaces salgan bien.</p>
+        <form id="form-network">
+          <div class="grid">
+            <div class="field">
+              <label for="publicUrl">Dirección pública de la web</label>
+              <input id="publicUrl" name="publicUrl" type="url" placeholder="https://directo.midominio.com" spellcheck="false">
+              <div class="hint">La que abrirán tus amigos. Para la Actividad de Discord debe ser HTTPS.</div>
+            </div>
+            <div class="field">
+              <label for="rtmpPublicUrl">Dirección pública RTMP <span class="note">(opcional)</span></label>
+              <input id="rtmpPublicUrl" name="rtmpPublicUrl" type="text" placeholder="rtmp://directo.midominio.com:1935" spellcheck="false">
+              <div class="hint">Solo si la cámara debe usar un nombre o puerto distinto al de la web (por ejemplo, con un túnel).</div>
+            </div>
+          </div>
+          <div class="actions">
+            <button class="btn primary" type="submit">Guardar</button>
+            <span class="note" data-result></span>
+          </div>
+        </form>
+      </section>
+
+      <!-- 4. Avisos -->
+      <section class="card panel">
+        <h2><span class="step">4</span> Discord · Avisos</h2>
+        <p class="lead">Al empezar el directo se publica un mensaje con una imagen y el enlace; se renueva solo y avisa al terminar.</p>
+        <form id="form-webhook">
+          <div class="field">
+            <label for="webhookUrl">URL del webhook</label>
+            <div class="row">
+              <input id="webhookUrl" name="webhookUrl" type="password" placeholder="https://discord.com/api/webhooks/…" autocomplete="off" spellcheck="false">
+              <button class="btn small" type="button" data-reveal="webhookUrl">Mostrar</button>
+            </div>
+            <div class="hint">En Discord: Editar canal → Integraciones → Webhooks → Nuevo webhook → Copiar URL.</div>
+          </div>
+          <div class="field">
+            <label for="title">Nombre del directo</label>
+            <input id="title" name="title" type="text" maxlength="80">
+          </div>
+          <div class="grid">
+            <div class="field">
+              <label for="mention">Mencionar al avisar</label>
+              <input id="mention" name="mention" type="text" placeholder="nadie" spellcheck="false">
+              <div class="hint">Vacío, <code>@everyone</code>, <code>@here</code> o el ID de un rol.</div>
+            </div>
+            <div class="field">
+              <label for="updateSeconds">Renovar la imagen</label>
+              <select id="updateSeconds" name="updateSeconds">
+                <option value="0">No renovar</option>
+                <option value="30">Cada 30 segundos</option>
+                <option value="60">Cada minuto</option>
+                <option value="120">Cada 2 minutos</option>
+                <option value="300">Cada 5 minutos</option>
+              </select>
+            </div>
+          </div>
+          <label class="check"><input id="keepLastImage" name="keepLastImage" type="checkbox"> Conservar la última imagen cuando termine el directo</label>
+          <div class="actions">
+            <button class="btn primary" type="submit">Guardar</button>
+            <button class="btn" type="button" id="webhook-test">Enviar mensaje de prueba</button>
+            <span class="note" data-result></span>
+          </div>
+          <p class="note" id="webhook-status"></p>
+        </form>
+      </section>
+
+      <!-- 5. Actividad -->
+      <section class="card panel">
+        <h2><span class="step">5</span> Discord · En el canal de voz</h2>
+        <p class="lead">Una Actividad muestra el directo dentro de Discord, en el propio canal de voz. Solo entran miembros del servidor que indiques.</p>
+        <form id="form-activity">
+          <div class="field">
+            <label for="discordClientId">ID de la aplicación (Client ID)</label>
+            <input id="discordClientId" name="discordClientId" type="text" inputmode="numeric" spellcheck="false">
+          </div>
+          <div class="field">
+            <label for="discordClientSecret">Secreto de cliente (Client Secret)</label>
+            <input id="discordClientSecret" name="discordClientSecret" type="password" autocomplete="off" spellcheck="false">
+            <div class="hint" id="secret-hint"></div>
+          </div>
+          <div class="field">
+            <label for="discordGuildIds">ID del servidor de Discord autorizado</label>
+            <input id="discordGuildIds" name="discordGuildIds" type="text" spellcheck="false">
+            <div class="hint">Con el modo desarrollador de Discord activado: clic derecho en el servidor → Copiar ID. Varios, separados por comas.</div>
+          </div>
+          <div class="actions">
+            <button class="btn primary" type="submit">Guardar</button>
+            <span class="note" data-result></span>
+          </div>
+        </form>
+        <div class="kv">
+          <span class="k">Estado</span><span class="v" id="activity-state">—</span><span></span>
+          <span class="k">Destino del mapeo «/»</span><span class="v" id="activity-host">—</span>
+          <button class="btn small" type="button" data-copy-text="activity-host">Copiar</button>
+        </div>
+        <ol class="steps">
+          <li>En <b>discord.com/developers</b> crea una aplicación y copia aquí su ID y su secreto (OAuth2).</li>
+          <li>En <b>OAuth2 → Redirects</b> añade <code>https://127.0.0.1</code>.</li>
+          <li>En <b>Activities → URL Mappings</b> pon prefijo <code>/</code> y como destino el valor de arriba; después activa las actividades en <b>Settings</b>.</li>
+          <li>Instala la aplicación en tu servidor y lánzala desde el canal de voz.</li>
+        </ol>
+      </section>
+
+      <!-- Ajustes -->
+      <section class="card panel wide">
+        <h2>Ajustes</h2>
+        <form id="form-settings">
+          <div class="field narrow">
+            <label for="graceSeconds">Margen de reconexión (segundos)</label>
+            <input id="graceSeconds" name="graceSeconds" type="number" min="0" max="600" step="1">
+            <div class="hint">Si la cámara pierde la conexión y vuelve dentro de este tiempo, se considera el mismo directo y no se avisa de nuevo.</div>
+          </div>
+          <div class="actions">
+            <button class="btn primary" type="submit">Guardar</button>
+            <span class="note" data-result></span>
+          </div>
+        </form>
+        <p class="note" id="ffmpeg-note"></p>
+      </section>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" role="status" hidden></div>
+
+  <script src="vendor/mpegts.js"></script>
+  <script src="vendor/hls.js"></script>
+  <script type="module" src="assets/admin.js"></script>
+</body>
+</html>

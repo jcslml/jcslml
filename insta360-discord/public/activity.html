@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="referrer" content="no-referrer">
+  <title>Directo</title>
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="assets/app.css">
+</head>
+<body>
+  <main id="stage" class="stage">
+    <div class="message">
+      <div class="inner">
+        <div class="spinner" id="boot-indicator"></div>
+        <h1 id="boot-title">Conectando con Discord…</h1>
+        <p id="boot-text"></p>
+        <div id="boot-extra"></div>
+      </div>
+    </div>
+  </main>
+  <script src="vendor/discord-sdk.js"></script>
+  <script src="vendor/mpegts.js"></script>
+  <script src="vendor/hls.js"></script>
+  <script type="module" src="assets/activity.js"></script>
+</body>
+</html>
