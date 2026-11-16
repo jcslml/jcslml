@@ -8,10 +8,13 @@ import http from 'node:http';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { promisify } from 'node:util';
+import zlib from 'node:zlib';
 import { WebSocketServer } from 'ws';
 import { createLimiter, safeEqual, signToken, verifyToken } from './auth.js';
 import { ConfigError } from './config.js';
 
+const gzip = promisify(zlib.gzip);
 const require = createRequire(import.meta.url);
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PUBLIC_DIR = path.join(ROOT, 'public');
@@ -112,6 +115,7 @@ export class HttpServer {
   constructor(deps) {
     Object.assign(this, deps);
     this.vendor = resolveVendor();
+    this.gzipCache = new Map();
     this.flvViewers = new Set();
     this.hlsViewers = new Map();
     this.loginLimiter = createLimiter({ windowMs: 10 * 60_000, max: 8 });
@@ -198,16 +202,35 @@ export class HttpServer {
     }
     if (!stat.isFile()) throw new HttpError(404, 'No encontrado.');
     const etag = `W/"${stat.size}-${Math.round(stat.mtimeMs)}"`;
+    const type = MIME[path.extname(file)] ?? 'application/octet-stream';
     const headers = this._headers({
-      'Content-Type': MIME[path.extname(file)] ?? 'application/octet-stream',
+      'Content-Type': type,
       'Cache-Control': cacheControl,
       ETag: etag,
+      Vary: 'Accept-Encoding',
     });
     if (req.headers['if-none-match'] === etag) {
       res.writeHead(304, headers);
       res.end();
       return;
     }
+
+    // Las bibliotecas del reproductor pesan cientos de kB: se envían comprimidas
+    // (se comprime una vez y se guarda en memoria).
+    const compressible = stat.size > 1024 && /^(text\/|application\/json|image\/svg)/.test(type);
+    if (compressible && /\bgzip\b/.test(String(req.headers['accept-encoding'] ?? ''))) {
+      let entry = this.gzipCache.get(file);
+      if (!entry || entry.etag !== etag) {
+        entry = { etag, body: await gzip(await fsp.readFile(file)) };
+        this.gzipCache.set(file, entry);
+      }
+      headers['Content-Encoding'] = 'gzip';
+      headers['Content-Length'] = entry.body.length;
+      res.writeHead(200, headers);
+      res.end(req.method === 'HEAD' ? undefined : entry.body);
+      return;
+    }
+
     headers['Content-Length'] = stat.size;
     res.writeHead(200, headers);
     if (req.method === 'HEAD') {

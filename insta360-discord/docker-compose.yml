@@ -1,0 +1,28 @@
+# Puente + Caddy (HTTPS automático). Uso:
+#   DOMINIO=directo.midominio.com docker compose up -d
+#   docker compose logs puente     ← aquí sale la contraseña del panel la primera vez
+services:
+  puente:
+    build: .
+    restart: unless-stopped
+    environment:
+      PUBLIC_URL: https://${DOMINIO:?Indica DOMINIO=tu.dominio.com}
+      TRUST_PROXY: "true"
+    ports:
+      - "1935:1935"   # entrada RTMP de la cámara
+    volumes:
+      - datos:/data
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    command: caddy reverse-proxy --from ${DOMINIO} --to puente:8080
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - caddy:/data
+
+volumes:
+  datos:
+  caddy:

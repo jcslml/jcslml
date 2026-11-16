@@ -57,6 +57,7 @@ export class StreamHub extends EventEmitter {
     this.fps = 0;
     this._lastBytes = 0;
     this._lastFrames = 0;
+    this._lastSampleAt = 0;
     clearInterval(this._readyTimer);
     this._readyTimer = null;
   }
@@ -203,8 +204,11 @@ export class StreamHub extends EventEmitter {
 
   _sample() {
     if (!this.publisher) return;
-    const kbps = ((this.bytes - this._lastBytes) * 8) / 1000;
-    const frames = this.videoFrames - this._lastFrames;
+    const now = Date.now();
+    const seconds = Math.max(0.25, (now - (this._lastSampleAt || now - 1000)) / 1000);
+    this._lastSampleAt = now;
+    const kbps = ((this.bytes - this._lastBytes) * 8) / 1000 / seconds;
+    const frames = (this.videoFrames - this._lastFrames) / seconds;
     this._lastBytes = this.bytes;
     this._lastFrames = this.videoFrames;
     this.bitrateKbps = this.bitrateKbps ? this.bitrateKbps * 0.6 + kbps * 0.4 : kbps;

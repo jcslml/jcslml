@@ -89,8 +89,8 @@ function toInt(value, name, min, max) {
 }
 
 const VALIDATORS = {
-  httpPort: (v) => toInt(v, 'Puerto web', 1, 65535),
-  rtmpPort: (v) => toInt(v, 'Puerto RTMP', 1, 65535),
+  httpPort: (v) => toInt(v, 'Puerto web', 0, 65535),
+  rtmpPort: (v) => toInt(v, 'Puerto RTMP', 0, 65535),
   bindHost: (v) => String(v).trim() || '0.0.0.0',
   trustProxy: toBool,
   keepLastImage: toBool,

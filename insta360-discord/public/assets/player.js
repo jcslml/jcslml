@@ -1,24 +1,29 @@
 // Reproductor del directo. Consulta el estado al servidor y, cuando hay señal,
-// reproduce con el transporte más adecuado:
-//   - baja latencia: FLV por WebSocket con mpegts.js (retardo de ~1 s);
-//   - compatible: HLS (hls.js o el HLS nativo del navegador), más retardo pero
-//     funciona en cualquier sitio.
-// Si el modo de baja latencia falla, cambia solo al compatible.
+// reproduce con el mejor transporte disponible:
+//   1. baja latencia: FLV por WebSocket con mpegts.js (retardo de ~1 s);
+//   2. compatible: HLS (hls.js o el HLS nativo del navegador), con más retardo;
+//   3. imágenes: una foto del directo cada 2 s, por si el navegador no deja
+//      reproducir vídeo de ninguna de las dos formas.
+// Si un transporte falla dos veces seguidas con el directo en marcha, pasa solo
+// al siguiente.
 
 /* global mpegts, Hls */
 
 const POLL_MS = 2000;
+const STILL_MS = 2000;
 
 export class LivePlayer extends EventTarget {
   /**
    * @param {object} options
    * @param {HTMLVideoElement} options.video
    * @param {string} options.base Ruta base de la señal, p. ej. "../m/<token>/".
+   * @param {HTMLImageElement} [options.image] Imagen para el modo de respaldo.
    * @param {'auto' | 'hls'} [options.mode]
    */
-  constructor({ video, base, mode = 'auto' }) {
+  constructor({ video, base, image = null, mode = 'auto' }) {
     super();
     this.video = video;
+    this.image = image;
     this.base = new URL(base.endsWith('/') ? base : `${base}/`, window.location.href);
     this.mode = mode;
     /** loading | offline | starting | playing | reconnecting | denied | unreachable | unsupported */
@@ -31,8 +36,9 @@ export class LivePlayer extends EventTarget {
     this._stopped = true;
     this._timer = null;
     this._networkErrors = 0;
-    this._flvFailures = 0;
-    this._forcedHls = false;
+    this._level = 0; // posición en la escalera de transportes
+    this._failures = 0;
+    this._exhausted = null; // emisión en la que fallaron todos los transportes
     this._failed = null;
     this._gotFrame = false;
     this._startedAt = 0;
@@ -42,9 +48,11 @@ export class LivePlayer extends EventTarget {
     const onFrame = () => this._onFrame();
     video.addEventListener('playing', onFrame);
     video.addEventListener('timeupdate', onFrame);
-    video.addEventListener('ended', () => this._transportEnded());
+    video.addEventListener('ended', () => {
+      if (this.transport && this.transport.kind !== 'images') this._transportEnded();
+    });
     video.addEventListener('error', () => {
-      if (this.transport?.kind === 'native') this._transportFailed('native');
+      if (this.transport?.kind === 'native') this._transportFailed();
     });
   }
 
@@ -75,12 +83,13 @@ export class LivePlayer extends EventTarget {
   /** Cambia entre baja latencia ('auto') y compatible ('hls'). */
   setMode(mode) {
     this.mode = mode;
-    this._forcedHls = false;
-    this._flvFailures = 0;
+    this._level = 0;
+    this._failures = 0;
+    this._exhausted = null;
     this._restart(0);
   }
 
-  /** Transporte en uso: 'flv', 'hls', 'native' o null. */
+  /** Transporte en uso: 'flv', 'hls', 'native', 'images' o null. */
   get kind() {
     return this.transport?.kind ?? null;
   }
@@ -112,7 +121,7 @@ export class LivePlayer extends EventTarget {
       if (res.status === 403) {
         this._teardown();
         this._setPhase('denied');
-        return; // quien usa el reproductor decide (p. ej. volver a autorizar)
+        return; // quien usa el reproductor decide (p. ej. pedir otro pase)
       }
       if (!res.ok) throw new Error(`estado ${res.status}`);
       const status = await res.json();
@@ -128,12 +137,15 @@ export class LivePlayer extends EventTarget {
     if (!this._stopped) this._timer = setTimeout(() => this._poll(), POLL_MS);
   }
 
-  _pick() {
+  /** Transportes posibles en este navegador, del preferido al último recurso. */
+  _ladder() {
     const support = LivePlayer.support();
-    const wantsHls = this.mode === 'hls' || this._forcedHls;
-    if (!wantsHls && support.flv) return 'flv';
-    if (support.hls) return 'hls';
-    return support.flv ? 'flv' : null;
+    const order = [];
+    if (this.mode !== 'hls' && support.flv) order.push('flv');
+    if (support.hls) order.push('hls');
+    if (this.mode === 'hls' && support.flv) order.push('flv');
+    if (this.image) order.push('images');
+    return order;
   }
 
   _reconcile() {
@@ -145,12 +157,17 @@ export class LivePlayer extends EventTarget {
       return;
     }
 
+    const ladder = this._ladder();
     if (this._failed) {
-      // Solo cuenta como fallo del modo de baja latencia si el directo seguía
-      // ahí; si la cámara se cortó, no es culpa del transporte.
-      if (this._failed.kind === 'flv' && this._failed.generation === status.generation) {
-        this._flvFailures += 1;
-        if (this._flvFailures >= 2 && this.mode === 'auto' && LivePlayer.support().hls) this._forcedHls = true;
+      // Solo cuenta como fallo del transporte si el directo seguía ahí; si la
+      // cámara se cortó, no es culpa suya.
+      if (this._failed.generation === status.generation) {
+        this._failures += 1;
+        if (this._failures >= 2) {
+          this._failures = 0;
+          if (this._level < ladder.length - 1) this._level += 1;
+          else this._exhausted = status.generation;
+        }
       }
       this._failed = null;
     }
@@ -160,8 +177,8 @@ export class LivePlayer extends EventTarget {
       return;
     }
 
-    const kind = this._pick();
-    if (!kind) {
+    const kind = ladder[Math.min(this._level, ladder.length - 1)];
+    if (!kind || this._exhausted === status.generation) {
       this._setPhase('unsupported');
       return;
     }
@@ -177,19 +194,21 @@ export class LivePlayer extends EventTarget {
     this._stalls = 0;
     this._setPhase('starting');
     if (kind === 'flv') this._startFlv(status);
-    else this._startHls();
+    else if (kind === 'hls') this._startHls();
+    else this._startImages();
   }
 
   /** Reinicia el transporte si la imagen lleva varios segundos sin avanzar. */
   _watchdog() {
     if (!this._gotFrame) {
-      if (performance.now() - this._startedAt > 12_000) this._transportFailed(this.transport.kind);
+      if (performance.now() - this._startedAt > 12_000) this._transportFailed();
       return;
     }
+    if (this.transport.kind === 'images') return;
     const time = this.video.currentTime;
     if (time === this._lastTime && !this.video.paused) {
       this._stalls += 1;
-      if (this._stalls >= 3) this._transportFailed(this.transport.kind);
+      if (this._stalls >= 3) this._transportFailed();
     } else {
       this._stalls = 0;
     }
@@ -197,10 +216,14 @@ export class LivePlayer extends EventTarget {
   }
 
   _onFrame() {
-    if (!this.transport || this.video.readyState < 2) return;
+    if (!this.transport || this.transport.kind === 'images' || this.video.readyState < 2) return;
+    this._markPlaying();
+  }
+
+  _markPlaying() {
     if (!this._gotFrame) {
       this._gotFrame = true;
-      if (this.transport.kind === 'flv') this._flvFailures = 0;
+      this._failures = 0;
     }
     this._setPhase('playing');
   }
@@ -248,7 +271,7 @@ export class LivePlayer extends EventTarget {
     };
     this.transport = transport;
     player.on(mpegts.Events.ERROR, () => {
-      if (this.transport === transport) this._transportFailed('flv');
+      if (this.transport === transport) this._transportFailed();
     });
     player.on(mpegts.Events.LOADING_COMPLETE, () => {
       if (this.transport === transport) this._transportEnded();
@@ -260,8 +283,7 @@ export class LivePlayer extends EventTarget {
 
   _startHls() {
     const src = new URL('hls/index.m3u8', this.base).href;
-    const support = LivePlayer.support();
-    if (support.hlsJs) {
+    if (LivePlayer.support().hlsJs) {
       const hls = new Hls({
         liveSyncDurationCount: 2,
         liveMaxLatencyDurationCount: 6,
@@ -274,7 +296,7 @@ export class LivePlayer extends EventTarget {
       const transport = { kind: 'hls', destroy: () => hls.destroy() };
       this.transport = transport;
       hls.on(Hls.Events.ERROR, (_event, data) => {
-        if (data.fatal && this.transport === transport) this._transportFailed('hls');
+        if (data.fatal && this.transport === transport) this._transportFailed();
       });
       hls.loadSource(src);
       hls.attachMedia(this.video);
@@ -283,6 +305,31 @@ export class LivePlayer extends EventTarget {
       this.video.src = src;
     }
     this._play();
+  }
+
+  /** Último recurso: mostrar la miniatura del servidor, renovada cada 2 s. */
+  _startImages() {
+    const image = this.image;
+    const load = () => {
+      const url = new URL('snapshot.jpg', this.base);
+      url.searchParams.set('t', String(Date.now()));
+      image.src = url.href;
+    };
+    const onLoad = () => {
+      if (this.transport === transport) this._markPlaying();
+    };
+    image.addEventListener('load', onLoad);
+    const timer = setInterval(load, STILL_MS);
+    const transport = {
+      kind: 'images',
+      destroy: () => {
+        clearInterval(timer);
+        image.removeEventListener('load', onLoad);
+        image.removeAttribute('src');
+      },
+    };
+    this.transport = transport;
+    load();
   }
 
   _teardown() {
@@ -294,13 +341,15 @@ export class LivePlayer extends EventTarget {
     } catch {
       // el reproductor ya estaba destruido
     }
-    this.video.removeAttribute('src');
-    this.video.load();
+    if (transport.kind !== 'images') {
+      this.video.removeAttribute('src');
+      this.video.load();
+    }
   }
 
-  _transportFailed(kind) {
+  _transportFailed() {
     if (!this.transport) return;
-    this._failed = { kind, generation: this.generation };
+    this._failed = { generation: this.generation };
     this._setPhase('starting');
     this._restart(700);
   }
@@ -336,7 +385,7 @@ export function describePhase(phase) {
     case 'unreachable':
       return { busy: true, title: 'Sin conexión con el servidor', text: 'Reintentando…' };
     case 'unsupported':
-      return { busy: false, title: 'Navegador no compatible', text: 'Este navegador no puede reproducir el directo. Prueba con una versión reciente de Chrome, Edge, Firefox o Safari.' };
+      return { busy: false, title: 'No se puede reproducir aquí', text: 'Este navegador no ha podido mostrar el directo. Prueba con una versión reciente de Chrome, Edge, Firefox o Safari.' };
     case 'denied':
       return { busy: false, title: 'Enlace no válido', text: 'El enlace ha caducado o ha sido sustituido por otro. Pide uno nuevo.' };
     default:

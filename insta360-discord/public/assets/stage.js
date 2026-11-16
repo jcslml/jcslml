@@ -6,6 +6,7 @@ import { LivePlayer, describePhase, formatClock } from './player.js';
 
 const TEMPLATE = `
   <video playsinline muted autoplay></video>
+  <img class="still" data-ref="still" alt="" hidden>
   <div class="message" data-ref="message">
     <div class="inner">
       <div data-ref="indicator"></div>
@@ -55,7 +56,7 @@ export function mountStage({ root, base, fullscreen = true, onDenied }) {
   const ref = {};
   for (const el of root.querySelectorAll('[data-ref]')) ref[el.dataset.ref] = el;
   const video = root.querySelector('video');
-  const player = new LivePlayer({ video, base, mode: storedMode() });
+  const player = new LivePlayer({ video, base, image: ref.still, mode: storedMode() });
   const support = LivePlayer.support();
 
   // ---------------------------------------------------------------- mensajes
@@ -88,7 +89,9 @@ export function mountStage({ root, base, fullscreen = true, onDenied }) {
       ref.title.textContent = status.title;
       document.title = `${live ? '🔴 ' : ''}${status.title}`;
     }
-    ref.sound.hidden = !(phase === 'playing' && status?.hasAudio);
+    const stills = player.kind === 'images';
+    ref.still.hidden = !(stills && phase === 'playing');
+    ref.sound.hidden = !(phase === 'playing' && status?.hasAudio && !stills);
     renderMode();
     if (phase !== 'playing') setIdle(false);
   }
@@ -117,8 +120,14 @@ export function mountStage({ root, base, fullscreen = true, onDenied }) {
 
   // -------------------------------------------------------------------- modo
   function renderMode() {
+    const stills = player.kind === 'images';
     const both = support.flv && support.hls;
-    ref.mode.hidden = !both || !player.status?.live;
+    ref.mode.hidden = !(both || stills) || !player.status?.live;
+    if (stills) {
+      ref.mode.innerHTML = `${icon('refresh')}<span>Solo imágenes</span>`;
+      ref.mode.title = 'El navegador no ha podido reproducir el vídeo: se muestra una imagen cada 2 segundos. Pulsa para volver a intentarlo.';
+      return;
+    }
     const low = player.kind ? player.kind === 'flv' : player.mode !== 'hls';
     ref.mode.innerHTML = `${icon(low ? 'zap' : 'layers')}<span>${low ? 'Baja latencia' : 'Compatible'}</span>`;
     ref.mode.title = low
@@ -126,7 +135,8 @@ export function mountStage({ root, base, fullscreen = true, onDenied }) {
       : 'Modo compatible (varios segundos de retraso). Pulsa para volver a baja latencia.';
   }
   ref.mode.addEventListener('click', () => {
-    const next = player.kind === 'flv' || (!player.kind && player.mode !== 'hls') ? 'hls' : 'auto';
+    const low = player.kind === 'flv' || (!player.kind && player.mode !== 'hls');
+    const next = player.kind === 'images' ? 'auto' : low ? 'hls' : 'auto';
     try {
       localStorage.setItem(MODE_KEY, next);
     } catch {
@@ -185,9 +195,9 @@ export function mountStage({ root, base, fullscreen = true, onDenied }) {
     const status = player.status;
     const running = status?.startedAt && player.phase !== 'offline';
     ref.clock.textContent = running ? formatClock(player.elapsedMs()) : '';
-    ref.stats.textContent = player.phase === 'playing' && video.videoWidth
-      ? `${video.videoWidth}×${video.videoHeight}`
-      : '';
+    if (player.phase !== 'playing') ref.stats.textContent = '';
+    else if (player.kind === 'images') ref.stats.textContent = 'una imagen cada 2 s';
+    else ref.stats.textContent = video.videoWidth ? `${video.videoWidth}×${video.videoHeight}` : '';
   }, 500);
 
   // ------------------------------------------------------------------ eventos

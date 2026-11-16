@@ -75,16 +75,16 @@ export async function createApp({ log, dataDir, env = process.env }) {
   hub.on('publish', ({ ip, encoder }) => {
     log('info', `Cámara conectada desde ${ip}${encoder ? ` (${encoder})` : ''}. Esperando la imagen…`);
   });
-  hub.on('live', () => {
-    const info = hub.info();
-    const size = info.width ? `${info.width}×${info.height}` : 'resolución desconocida';
-    const tracks = [info.videoCodec, info.hasAudio ? info.audioCodec : 'sin audio'].filter(Boolean).join(' + ');
-    log('info', `Señal recibida: ${size}, ${tracks}.`);
-  });
   hub.on('offline', ({ reason, wasLive }) => {
     if (!wasLive) log('info', `La cámara se desconectó antes de enviar imagen (${reason || 'sin motivo'}).`);
   });
-  tracker.on('start', () => log('info', '🔴 Directo en marcha.'));
+  const describeSignal = () => {
+    const info = hub.info();
+    const size = info.width ? `${info.width}×${info.height}` : 'resolución desconocida';
+    const tracks = [info.videoCodec, info.hasAudio ? info.audioCodec : 'sin audio'].filter(Boolean).join(' + ');
+    return `${size}, ${tracks}`;
+  };
+  tracker.on('start', () => log('info', `🔴 Directo en marcha (${describeSignal()}).`));
   tracker.on('resume', () => log('info', 'La cámara ha vuelto: el directo continúa.'));
   tracker.on('drop', () => {
     log('warn', `Se ha perdido la señal de la cámara. Se espera ${config.get('graceSeconds')} s por si vuelve.`);
